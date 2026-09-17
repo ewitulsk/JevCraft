@@ -102,6 +102,9 @@ public final class CompanionActionExecutor {
     public boolean renameAtAnvil(ServerLevel level,BlockHitResult hit,int inputSlot,String name){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.renameAtAnvil(level,hit,inputSlot,name);
     }
+    public boolean enchant(ServerLevel level,BlockHitResult hit,int itemSlot,int lapisSlot,int option){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.enchant(level,hit,itemSlot,lapisSlot,option);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);

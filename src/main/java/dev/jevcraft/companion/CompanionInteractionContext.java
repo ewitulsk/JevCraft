@@ -17,6 +17,7 @@ import net.minecraft.world.inventory.BlastFurnaceMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.EnchantmentMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
 import net.minecraft.world.inventory.GrindstoneMenu;
 import net.minecraft.world.inventory.MerchantMenu;
@@ -284,6 +285,18 @@ public final class CompanionInteractionContext {
         AnvilMenu menu=new AnvilMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int sourceMenu=playerMenuSlot(menu,actor,inputSlot),destinationMenu=playerMenuSlot(menu,actor,destination),levelBefore=actor.experienceLevel;if(sourceMenu<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
         menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);if(!menu.setItemName(name)||!menu.getSlot(2).hasItem()||menu.getCost()<=0||menu.getCost()>levelBefore){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(2).getItem().copy();int cost=menu.getCost();menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);companion.setExperience(actor.experienceLevel,actor.totalExperience,actor.experienceProgress);
         boolean exact=countItem(companion.inventory(),input)==0&&countItem(companion.inventory(),result)>=result.getCount()&&companion.experienceLevel()==levelBefore-cost;clearPlayer(actor);return exact;
+    }
+
+    /** Enchants one item through the real table slots and charges Jev-owned lapis and XP. */
+    public boolean enchant(ServerLevel level,BlockHitResult hit,int itemSlot,int lapisSlot,int option){
+        if(itemSlot<0||lapisSlot<0||itemSlot==lapisSlot||itemSlot>=companion.inventory().getContainerSize()||lapisSlot>=companion.inventory().getContainerSize()||option<0||option>2)return false;
+        ItemStack input=companion.inventory().getItem(itemSlot).copy(),lapis=companion.inventory().getItem(lapisSlot).copy();if(input.isEmpty()||!lapis.is(net.minecraft.world.item.Items.LAPIS_LAZULI))return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);actor.experienceLevel=companion.experienceLevel();actor.totalExperience=companion.totalExperience();actor.experienceProgress=companion.experienceProgress();int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);if(!access.consumesAction()){clearPlayer(actor);return false;}
+        EnchantmentMenu menu=new EnchantmentMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int itemMenu=playerMenuSlot(menu,actor,itemSlot),lapisMenu=playerMenuSlot(menu,actor,lapisSlot),lapisBefore=countItem(actor.getInventory(),lapis),levelBefore=actor.experienceLevel;if(itemMenu<0||lapisMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
+        menu.clicked(itemMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(itemMenu,0,ClickType.PICKUP,actor);menu.clicked(lapisMenu,0,ClickType.PICKUP,actor);menu.clicked(1,1,ClickType.PICKUP,actor);menu.clicked(lapisMenu,0,ClickType.PICKUP,actor);
+        if(menu.costs[option]<=0||menu.costs[option]>levelBefore||!menu.clickMenuButton(actor,option)){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(0).getItem().copy();menu.removed(actor);syncFromPlayer(actor);companion.setExperience(actor.experienceLevel,actor.totalExperience,actor.experienceProgress);
+        boolean exact=countItem(companion.inventory(),input)==0&&countItem(companion.inventory(),result)>=result.getCount()&&countItem(companion.inventory(),lapis)==lapisBefore-(option+1)&&companion.experienceLevel()==levelBefore-(option+1);clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
