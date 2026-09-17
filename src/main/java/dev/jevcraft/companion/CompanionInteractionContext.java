@@ -1,7 +1,9 @@
 package dev.jevcraft.companion;
 
 import com.mojang.authlib.GameProfile;
+import dev.jevcraft.mixin.BeaconBlockEntityAccessor;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
@@ -10,12 +12,14 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.CartographyTableMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.inventory.BlastFurnaceMenu;
 import net.minecraft.world.inventory.BrewingStandMenu;
+import net.minecraft.world.inventory.BeaconMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -33,6 +37,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
+import net.minecraft.world.level.block.entity.BeaconBlockEntity;
 import net.minecraft.world.level.block.entity.SmokerBlockEntity;
 import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
@@ -46,8 +51,10 @@ import net.neoforged.neoforge.common.util.FakePlayerFactory;
 public final class CompanionInteractionContext {
     private final JevCompanion companion;
     private FakePlayer player;
+    private String lastFailure="";
 
     public CompanionInteractionContext(JevCompanion companion) { this.companion = companion; }
+    public String lastFailure(){return lastFailure;}
 
     public FakePlayer player(ServerLevel level) {
         if (player == null || player.serverLevel() != level) {
@@ -231,12 +238,12 @@ public final class CompanionInteractionContext {
     }
 
     public boolean collectFurnace(ServerLevel level,BlockHitResult hit){
-        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=emptySlot();if(handSlot<0){clearPlayer(actor);return false;}actor.getInventory().selected=handSlot<9?handSlot:0;
+        lastFailure="";FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=emptySlot();if(handSlot<0){lastFailure="full_inventory";clearPlayer(actor);return false;}actor.getInventory().selected=handSlot<9?handSlot:0;
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
-        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof AbstractFurnaceMenu;
-        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=opened?(AbstractFurnaceMenu)actor.containerMenu:furnaceMenu(actor,furnace);int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);
-        boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
+        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){lastFailure="access_or_empty access="+access+" block="+(blockEntity==null?"null":blockEntity.getClass().getSimpleName());actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof AbstractFurnaceMenu;
+        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=opened?(AbstractFurnaceMenu)actor.containerMenu:furnaceMenu(actor,furnace);int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){lastFailure="missing_destination opened="+opened;if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);
+        int after=countItem(companion.inventory(),result);boolean empty=furnace.getItem(2).isEmpty(),collected=after>=before+result.getCount()&&empty;if(!collected)lastFailure="transfer opened="+opened+" empty="+empty+" before="+before+" after="+after+" result="+result;clearPlayer(actor);return collected;
     }
 
     /** Selects a requested stonecutting result and takes it through the real result slot callback. */
@@ -319,7 +326,7 @@ public final class CompanionInteractionContext {
     }
 
     public boolean collectBrewingStand(ServerLevel level,BlockHitResult hit,int standSlot){
-        if(standSlot<0||standSlot>2)return false;FakePlayer actor=player(level);syncToPlayer(actor);int destination=emptySlot();if(destination<0){clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BrewingStandBlockEntity stand)||stand.getItem(standSlot).isEmpty()){actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof BrewingStandMenu;BrewingStandMenu menu=opened?(BrewingStandMenu)actor.containerMenu:new BrewingStandMenu(0,actor.getInventory(),stand,new SimpleContainerData(2));int destinationMenu=playerMenuSlot(menu,actor,destination);if(destinationMenu<0){if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}ItemStack result=stand.getItem(standSlot).copy();int before=countItem(actor.getInventory(),result);menu.clicked(standSlot,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);boolean exact=stand.getItem(standSlot).isEmpty()&&countItem(companion.inventory(),result)>=before+result.getCount();clearPlayer(actor);return exact;
+        lastFailure="";if(standSlot<0||standSlot>2){lastFailure="invalid_slot";return false;}FakePlayer actor=player(level);syncToPlayer(actor);int destination=emptySlot();if(destination<0){lastFailure="full_inventory";clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BrewingStandBlockEntity stand)||stand.getItem(standSlot).isEmpty()){lastFailure="access_or_empty access="+access+" block="+(blockEntity==null?"null":blockEntity.getClass().getSimpleName());actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof BrewingStandMenu;BrewingStandMenu menu=opened?(BrewingStandMenu)actor.containerMenu:new BrewingStandMenu(0,actor.getInventory(),stand,new SimpleContainerData(2));int destinationMenu=playerMenuSlot(menu,actor,destination);if(destinationMenu<0){lastFailure="missing_destination opened="+opened;if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}ItemStack result=stand.getItem(standSlot).copy();int before=countItem(actor.getInventory(),result);menu.clicked(standSlot,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);int after=countItem(companion.inventory(),result);boolean empty=stand.getItem(standSlot).isEmpty(),exact=empty&&after>=before+result.getCount();if(!exact)lastFailure="transfer opened="+opened+" empty="+empty+" before="+before+" after="+after+" result="+result;clearPlayer(actor);return exact;
     }
 
     /** Completes one filled-map cartography operation through normal input and result slots. */
@@ -329,6 +336,12 @@ public final class CompanionInteractionContext {
         CartographyTableMenu menu=opened?(CartographyTableMenu)actor.containerMenu:new CartographyTableMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int mapMenu=playerMenuSlot(menu,actor,mapSlot),additionMenu=playerMenuSlot(menu,actor,additionSlot),destinationMenu=playerMenuSlot(menu,actor,destination);if(mapMenu<0||additionMenu<0||destinationMenu<0){if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}
         menu.clicked(mapMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(mapMenu,0,ClickType.PICKUP,actor);menu.clicked(additionMenu,0,ClickType.PICKUP,actor);menu.clicked(1,1,ClickType.PICKUP,actor);menu.clicked(additionMenu,0,ClickType.PICKUP,actor);if(!menu.getSlot(2).hasItem()){if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(2).getItem().copy();menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);
         boolean exact=countItem(companion.inventory(),map)==map.getCount()-1&&countItem(companion.inventory(),addition)==addition.getCount()-1&&countItemType(companion.inventory(),result.getItem())>=result.getCount();clearPlayer(actor);return exact;
+    }
+
+    /** Pays and selects an available beacon primary effect through the block-opened vanilla menu. */
+    public boolean activateBeacon(ServerLevel level,BlockHitResult hit,int paymentSlot,Holder<MobEffect> primary){
+        lastFailure="";if(paymentSlot<0||paymentSlot>=companion.inventory().getContainerSize()||companion.inventory().getItem(paymentSlot).isEmpty()||primary==null){lastFailure="invalid_input";return false;}ItemStack payment=companion.inventory().getItem(paymentSlot).copy();FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(paymentSlot);actor.getInventory().selected=handSlot<9?handSlot:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
+        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BeaconBlockEntity beacon)){lastFailure="access_or_block access="+access+" block="+(blockEntity==null?"null":blockEntity.getClass().getSimpleName());actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof BeaconMenu;BeaconMenu menu=opened?(BeaconMenu)actor.containerMenu:new BeaconMenu(0,actor.getInventory(),((BeaconBlockEntityAccessor)beacon).jevcraft$dataAccess(),ContainerLevelAccess.create(level,hit.getBlockPos()));if(menu.getLevels()<1){lastFailure="unpowered levels="+menu.getLevels();if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}int sourceMenu=playerMenuSlot(menu,actor,paymentSlot);if(sourceMenu<0){lastFailure="missing_payment_slot";if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(sourceMenu,0,ClickType.QUICK_MOVE,actor);if(!menu.hasPayment()){lastFailure="payment_not_routed";if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.updateEffects(java.util.Optional.of(primary),java.util.Optional.empty());boolean selected=primary.equals(menu.getPrimaryEffect())&&!menu.hasPayment();if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);boolean exact=countItem(companion.inventory(),payment)==payment.getCount()-1;if(!selected||!exact)lastFailure="selection_or_payment selected="+selected+" remaining="+countItem(companion.inventory(),payment);clearPlayer(actor);return selected&&exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){

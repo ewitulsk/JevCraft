@@ -2,11 +2,13 @@ package dev.jevcraft.companion;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ArrowItem;
@@ -49,6 +51,7 @@ public final class CompanionActionExecutor {
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public String lastFailure(){return lastFailure;}
+    public String lastInteractionFailure(){return interactions.lastFailure();}
     public float miningProgress() { return miningProgress; }
     public InteractionResult place(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         return useBlock(level,hit,inventorySlot);
@@ -116,6 +119,9 @@ public final class CompanionActionExecutor {
     }
     public boolean cartography(ServerLevel level,BlockHitResult hit,int mapSlot,int additionSlot){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.cartography(level,hit,mapSlot,additionSlot);
+    }
+    public boolean activateBeacon(ServerLevel level,BlockHitResult hit,int paymentSlot,Holder<MobEffect> primary){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.activateBeacon(level,hit,paymentSlot,primary);
     }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
