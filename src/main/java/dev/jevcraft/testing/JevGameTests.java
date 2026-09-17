@@ -21,6 +21,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.animal.Wolf;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.trading.ItemCost;
 import net.minecraft.world.item.trading.MerchantOffer;
@@ -304,6 +305,12 @@ public final class JevGameTests {
         helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),second,7).consumesAction(),"second animal rejected normal player interaction");
         helper.assertTrue(first.isInLove()&&second.isInLove(),"wheat interactions did not put both adult cows in love");
         helper.assertTrue(entity.inventory().getItem(7).isEmpty(),"feeding did not consume exactly two wheat");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionTamesWolfWithItsPersistentIdentity(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Wolf wolf=helper.spawn(EntityType.WOLF,new BlockPos(3,1,2));wolf.setNoAi(true);wolf.getRandom().setSeed(0);entity.inventory().setItem(14,new ItemStack(Items.BONE));
+        helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),wolf,14).consumesAction(),"wolf rejected normal bone interaction");helper.assertTrue(wolf.isTame(),"seeded vanilla taming callback did not tame wolf");helper.assertValueEqual(wolf.getOwnerUUID(),entity.getUUID(),"wolf owner identity did not resolve to persistent Jev UUID");helper.assertTrue(entity.inventory().getItem(14).isEmpty(),"taming did not consume exactly one bone");helper.succeed();
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
