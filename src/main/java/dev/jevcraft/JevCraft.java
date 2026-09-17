@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
 import dev.jevcraft.client.TakeoverRuntime;
 import dev.jevcraft.companion.JevCompanion;
+import dev.jevcraft.companion.JevInferenceHost;
 import dev.jevcraft.companion.JevSpawnEggItem;
 import dev.jevcraft.companion.MovingChunkTickets;
 import dev.jevcraft.companion.JevWorldData;
@@ -160,6 +161,7 @@ public final class JevCraft {
         }
     }
     private void serverTick(ServerTickEvent.Post event) {
+        JevInferenceHost.instance().tick(event.getServer());
         JevWorldData.get(event.getServer()).tickRespawns(event.getServer());
         if (persistenceReloadTicks >= 0 && --persistenceReloadTicks == 0) {
             persistenceReloadTicks = -1;
@@ -251,6 +253,14 @@ public final class JevCraft {
                         .then(Commands.literal("enable").executes(context -> changeOperatorCapability(context, true)))
                         .then(Commands.literal("disable").executes(context -> changeOperatorCapability(context, false)))))
                 .then(Commands.literal("setspawn").then(Commands.argument("name", StringArgumentType.word()).executes(this::setCompanionSpawn))));
+        event.getDispatcher().register(Commands.literal("jev").then(Commands.literal("metrics").executes(context -> {
+            var metrics = JevInferenceHost.instance().metrics();
+            context.getSource().sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                    "Jev requests=%d success=%d failed=%d throttled=%d queued=%d running=%d inputTokens=%d p50=%dms p95=%dms estimatedInputCost=$%.6f",
+                    metrics.requests(), metrics.successes(), metrics.failures(), metrics.throttles(), JevInferenceHost.instance().queuedCount(),
+                    JevInferenceHost.instance().runningCount(), metrics.inputTokens(), metrics.p50LatencyMs(), metrics.p95LatencyMs(), metrics.estimatedInputCostUsd())), false);
+            return 1;
+        })));
         event.getDispatcher().register(Commands.literal("msg")
                 .then(Commands.argument("jevName", StringArgumentType.word())
                         .suggests((context, builder) -> { for (JevCompanion jev : companions(context.getSource().getServer())) builder.suggest(jev.getName().getString()); return builder.buildFuture(); })

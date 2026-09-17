@@ -5,7 +5,7 @@ Status is deliberately split so an API surface is never presented as autonomous 
 | Family | Exposed | Mechanically verified | Live Jev measured | Mod compatibility |
 |---|---|---|---|---|
 | Typed Choice / Score / Boolean inference | Yes, both provider dialects | Fake endpoints; live Vercel mixed request | Vercel transport only | N/A |
-| Cancellation, freshness, ten-controller scheduling | Yes | JUnit contracts | Not measured at ten actors | N/A |
+| Cancellation, freshness, ten-controller scheduling, cost controls | Shared fair queue; configurable concurrency and hard input-token ceiling; host-wide retry backoff; `/jev metrics` | JUnit contracts plus live in-world dispatch through scheduler | Not measured at ten actors | N/A |
 | Goal parsing and typed goal families | Partial | JUnit contracts | Not measured | Vanilla labels only |
 | Local takeover instruction/stop UI | Shared by full/client artifacts; visible status; physical-input reclaim; F9 cancellation; normal multiplayer movement/mining/pickup | Hidden unfocused real-client loopback passes with deterministic and live decisions | Live Vercel/Jev takeover passed September 17, 2026 | Vanilla NeoForge client/server path |
 | Ground movement | Follow/navigation and mining approach | Server entity boot; mining approach exercised | Not measured end-to-end | Vanilla only |

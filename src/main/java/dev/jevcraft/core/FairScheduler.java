@@ -9,7 +9,6 @@ public final class FairScheduler {
     private final int maxConcurrent;
     private final Map<UUID, Work> newest = new LinkedHashMap<>();
     private final Set<UUID> running = new HashSet<>();
-    private long cursor;
     public FairScheduler(int maxActors, int maxConcurrent) {
         if (maxActors < 1 || maxActors > 10 || maxConcurrent < 1 || maxConcurrent > maxActors) throw new IllegalArgumentException();
         this.maxActors = maxActors; this.maxConcurrent = maxConcurrent;
@@ -22,10 +21,12 @@ public final class FairScheduler {
         newest.entrySet().removeIf(e -> e.getValue().deadline().isBefore(now));
         if (running.size() >= maxConcurrent || newest.isEmpty()) return Optional.empty();
         Work selected = newest.values().stream().filter(w -> !running.contains(w.actor()))
-                .max(Comparator.comparingInt(Work::urgency).thenComparing(w -> -Math.floorMod(w.sequence() - cursor, Long.MAX_VALUE))).orElse(null);
+                .max(Comparator.comparingInt(Work::urgency).thenComparingLong(w -> -w.sequence())).orElse(null);
         if (selected == null) return Optional.empty();
-        newest.remove(selected.actor()); running.add(selected.actor()); cursor = selected.sequence(); return Optional.of(selected);
+        newest.remove(selected.actor()); running.add(selected.actor()); return Optional.of(selected);
     }
     public synchronized void complete(UUID actor) { running.remove(actor); }
+    public synchronized void cancel(UUID actor) { newest.remove(actor); running.remove(actor); }
     public synchronized int queued() { return newest.size(); }
+    public synchronized int running() { return running.size(); }
 }

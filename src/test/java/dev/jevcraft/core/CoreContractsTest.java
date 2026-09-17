@@ -95,4 +95,26 @@ class CoreContractsTest {
         scheduler.offer(new FairScheduler.Work(actor, 1, deadline, 1)); scheduler.offer(new FairScheduler.Work(actor, 2, deadline, 2));
         assertEquals(1, scheduler.queued()); assertEquals(2, scheduler.poll(Instant.now()).orElseThrow().urgency());
     }
+
+    @Test void schedulerIsFairHonorsConcurrencyExpiryAndCancellation() {
+        FairScheduler scheduler = new FairScheduler(3, 1); Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID(), expired = UUID.randomUUID();
+        scheduler.offer(new FairScheduler.Work(first, 1, now.plusSeconds(5), 1));
+        scheduler.offer(new FairScheduler.Work(second, 1, now.plusSeconds(5), 2));
+        scheduler.offer(new FairScheduler.Work(expired, 9, now.minusSeconds(1), 3));
+        assertEquals(first, scheduler.poll(now).orElseThrow().actor()); assertEquals(1, scheduler.running()); assertTrue(scheduler.poll(now).isEmpty());
+        scheduler.complete(first); assertEquals(second, scheduler.poll(now).orElseThrow().actor());
+        scheduler.cancel(second); assertEquals(0, scheduler.running()); assertEquals(0, scheduler.queued());
+    }
+
+    @Test void inferenceMetricsBoundLatencyAndEstimateInputCost() {
+        InferenceMetrics metrics = new InferenceMetrics(); UUID request = UUID.randomUUID();
+        metrics.requestStarted(); metrics.succeeded(new InferenceResponse(request, "gateway", "jev", Map.of(), new InferenceResponse.Usage(100, 0), Map.of(), List.of(), Duration.ofMillis(30)));
+        metrics.requestStarted(); metrics.succeeded(new InferenceResponse(request, "gateway", "jev", Map.of(), new InferenceResponse.Usage(300, 0), Map.of(), List.of(), Duration.ofMillis(10)));
+        metrics.requestStarted(); metrics.failed(new ProviderException(429, "limited", Duration.ofSeconds(1)));
+        var snapshot = metrics.snapshot(.04);
+        assertEquals(3, snapshot.requests()); assertEquals(2, snapshot.successes()); assertEquals(1, snapshot.failures()); assertEquals(1, snapshot.throttles());
+        assertEquals(400, snapshot.inputTokens()); assertEquals(10, snapshot.p50LatencyMs()); assertEquals(30, snapshot.p95LatencyMs());
+        assertEquals(.000016, snapshot.estimatedInputCostUsd(), .0000001);
+    }
 }

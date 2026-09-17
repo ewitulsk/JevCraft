@@ -208,6 +208,7 @@ public final class JevCompanion extends PathfinderMob {
             observeChat(entry.getUUID("Sender"), entry.getString("Text"), entry.getBoolean("Authorized"), entry.getBoolean("Private"));
     }
     @Override protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean recentlyHit) {
+        JevInferenceHost.instance().cancel(getUUID());
         super.dropCustomDeathLoot(level, source, recentlyHit);
         for (ItemStack stack : inventory.removeAllItems()) if (!stack.isEmpty()) spawnAtLocation(stack);
         CompoundTag respawnState = new CompoundTag(); addAdditionalSaveData(respawnState);
