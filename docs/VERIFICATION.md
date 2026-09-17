@@ -3,10 +3,10 @@
 ## Automated
 
 - `gradlew test`: provider schema fixtures, permissions, exactly-once grants, chat isolation, memory privacy, inventory revisions, moving chunk bounds, parser behavior, stale-decision cancellation, and scheduling.
-- `gradlew runGameTestServer`: boots NeoForge 21.1.250 for Minecraft 1.21.1 and runs 12 in-world tests covering body attributes, role/chat persistence, native `/msg` coexistence and authority, world roster/cap/grants, progressive mining, placement, combat, food, chest-menu transfer, crafting-menu callbacks, and immediate stop.
+- `gradlew runGameTestServer`: boots NeoForge 21.1.250 for Minecraft 1.21.1 and runs 13 in-world tests covering body attributes, role/chat persistence, exactly-once death drops and same-UUID respawn, native `/msg` coexistence and authority, world roster/cap/grants, progressive mining, placement, combat, food, chest-menu transfer, crafting-menu callbacks, and immediate stop.
 - `gradlew build`: creates full and client-only artifacts.
 - `scripts/Test-HiddenTakeover.ps1`: launches only project-owned processes and an unfocused hidden GLFW client against a loopback dedicated server. Its default deterministic typed decision fixture isolates client mechanics; `-LiveGateway` requires a live Vercel/Jev decision. Paired evidence requires normal multiplayer block removal, item pickup, goal completion, and released synthetic keys.
-- `scripts/Test-Persistence.ps1`: creates state in a dedicated-server world, stops through the normal save path, boots the same world again, and mechanically verifies entity and world SavedData fields before another orderly stop.
+- `scripts/Test-Persistence.ps1`: creates state and a pending respawn in a dedicated-server world, stops through the normal save path, boots the same world again, and mechanically verifies entity state, world SavedData, ticking tickets, and completion of the queued same-UUID respawn before another orderly stop.
 - `scripts/Test-RemoteTicking.ps1`: boots a dedicated server with no players, places a Jev and furnace 40 chunks from spawn, and requires both the entity and furnace to keep ticking through a registered 5×5 ticking region.
 
 ## Opt-in live route

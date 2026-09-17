@@ -16,6 +16,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -165,7 +166,7 @@ public final class JevGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "empty", timeoutTicks = 100)
+    @GameTest(template = "empty", timeoutTicks = 100, batch = "roster")
     public static void worldRosterEnforcesTenAndUniqueNames(GameTestHelper helper) {
         JevWorldData data = JevWorldData.get(helper.getLevel().getServer());
         java.util.List<UUID> ids = new java.util.ArrayList<>();
@@ -183,6 +184,38 @@ public final class JevGameTests {
         helper.assertValueEqual(data.grant(player), JevWorldData.GrantState.CONSUMED, "consumed grant must never reissue");
         ids.forEach(data::unregister);
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 240, batch = "lifecycle")
+    public static void deathDropsOnceAndRespawnsPersistentIdentity(GameTestHelper helper) {
+        JevWorldData data = JevWorldData.get(helper.getLevel().getServer());
+        int initialRosterSize = data.livingCount(); UUID id = UUID.randomUUID(), owner = UUID.randomUUID(), admin = UUID.randomUUID();
+        JevCompanion original = JevCraft.JEV.get().create(helper.getLevel());
+        helper.assertTrue(original != null, "registered companion type did not create");
+        original.setUUID(id); original.setOwner(owner); original.addAdministrator(admin); original.setCustomName(net.minecraft.network.chat.Component.literal("RespawnJev"));
+        original.acceptGoal("follow me"); original.observeChat(owner, "persistent memory", true, true); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 3));
+        BlockPos spawn = helper.absolutePos(new BlockPos(2, 1, 2)); original.moveTo(spawn.getX() + .5, spawn.getY(), spawn.getZ() + .5, 0, 0);
+        helper.assertTrue(data.register(id, "RespawnJev"), "could not reserve lifecycle roster slot");
+        helper.assertTrue(helper.getLevel().addFreshEntity(original), "could not add lifecycle Jev");
+        original.kill();
+        helper.assertValueEqual(data.pendingRespawnCount(), 1, "death did not enqueue one respawn");
+        helper.assertValueEqual(data.livingCount(), initialRosterSize + 1, "death released the persistent roster slot");
+        helper.succeedWhen(() -> {
+            JevCompanion replacement = null;
+            for (var candidate : helper.getLevel().getEntitiesOfClass(JevCompanion.class, new net.minecraft.world.phys.AABB(spawn).inflate(16)))
+                if (candidate.getUUID().equals(id) && candidate != original) { replacement = candidate; break; }
+            helper.assertTrue(replacement != null && replacement.isAlive(), "same-UUID Jev did not respawn");
+            helper.assertValueEqual(replacement.owner(), owner, "respawn lost owner");
+            helper.assertTrue(replacement.administrators().contains(admin), "respawn lost administrator");
+            helper.assertValueEqual(replacement.currentGoal(), "follow me", "respawn lost goal");
+            helper.assertValueEqual(replacement.recentChat().size(), 1, "respawn lost memory");
+            helper.assertTrue(replacement.inventory().isEmpty(), "dropped inventory was also restored");
+            int dropped = helper.getLevel().getEntitiesOfClass(ItemEntity.class, new net.minecraft.world.phys.AABB(spawn).inflate(16)).stream()
+                    .filter(item -> item.getItem().is(Items.OAK_LOG)).mapToInt(item -> item.getItem().getCount()).sum();
+            helper.assertValueEqual(dropped, 3, "inventory did not drop exactly once");
+            helper.assertValueEqual(data.pendingRespawnCount(), 0, "completed respawn remained queued");
+            data.unregister(id);
+        });
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)

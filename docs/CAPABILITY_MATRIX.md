@@ -11,7 +11,7 @@ Status is deliberately split so an API surface is never presented as autonomous 
 | Ground movement | Follow/navigation and mining approach | Server entity boot; mining approach exercised | Not measured end-to-end | Vanilla only |
 | Mining / placement / pickup | Dedicated per-Jev player context; progressive mining; normal use placement; authoritative pickup | GameTests for mining, placement and stack consumption | Vercel-selected visible-log mining passed | Vanilla only |
 | Combat / food | Dedicated player attack context; damageable body; food callbacks | GameTests for damage and food consumption | No | Vanilla only |
-| Personal inventory and death drops | 36-slot companion inventory | Save/load GameTest; transaction contracts | No | Vanilla stacks only |
+| Personal inventory, death, respawn | 36-slot inventory; exactly-once death drops; persisted same-UUID respawn queue | GameTest plus queued-respawn two-boot round trip | No | Respawns at valid world spawn with death-position fallback |
 | Containers and workstations | Revision transaction core plus real chest and crafting menu sessions | Chest deposit and single-ingredient crafting GameTests | No | Vanilla chest/table proof only |
 | Spawn egg and starter grant | World SavedData roster, unique names, ten-living cap, pending/delivered/consumed grants | JUnit roster contracts and world-roster GameTest | N/A | Vanilla inventory |
 | Owner/admin permissions | UUID owner plus persisted administrator set; `/jev admin` owner/operator management | JUnit contracts; serialization and command GameTests | N/A | Command-permission mods untested |

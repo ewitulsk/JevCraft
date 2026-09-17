@@ -10,6 +10,7 @@ import dev.jevcraft.companion.JevWorldData;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -122,6 +123,7 @@ public final class JevCraft {
         UUID owner = UUID.fromString("aa628850-ec31-4cc0-8d88-b9a3a13cd5d9");
         UUID admin = UUID.fromString("11548867-8593-497c-99a3-48bce967ce00");
         UUID grantPlayer = UUID.fromString("1cf589fd-ecda-4a65-8ab1-497b184387fe");
+        UUID respawnActor = UUID.fromString("d8199b62-5f13-4683-8bd4-c6318ec971eb");
         if (phase.equals("create")) {
             JevCompanion jev = JEV.get().create(level); if (jev == null) throw new IllegalStateException("persistence fixture entity creation failed");
             jev.setUUID(actor); jev.setCustomName(Component.literal("PersistJev")); jev.setOwner(owner); jev.addAdministrator(admin);
@@ -129,6 +131,11 @@ public final class JevCraft {
             BlockPos spawn = level.getSharedSpawnPos(); jev.moveTo(spawn.getX()+.5, spawn.getY()+1, spawn.getZ()+.5, 0, 0);
             if (!level.addFreshEntity(jev)) throw new IllegalStateException("persistence fixture entity add failed");
             JevWorldData data=JevWorldData.get(server); if(!data.register(actor,"PersistJev"))throw new IllegalStateException("persistence fixture roster add failed"); data.grant(grantPlayer); data.grantDelivered(grantPlayer);
+            JevCompanion queued = JEV.get().create(level); if (queued == null) throw new IllegalStateException("respawn persistence fixture creation failed");
+            queued.setUUID(respawnActor); queued.setOwner(owner); queued.addAdministrator(admin); queued.acceptGoal("resume after restart"); queued.observeChat(owner, "durable respawn memory", true, true);
+            CompoundTag queuedState = new CompoundTag(); queued.addAdditionalSaveData(queuedState); queuedState.putLong("RespawnFallbackPos", spawn.asLong());
+            if (!data.register(respawnActor, "RestartJev")) throw new IllegalStateException("respawn persistence roster add failed");
+            data.queueRespawn(respawnActor, queuedState, level.getGameTime() + 60);
             LOGGER.info("PERSISTENCE_CREATE_READY");
             persistenceShutdownTicks = 40;
         } else if (phase.equals("reload")) {
@@ -151,6 +158,7 @@ public final class JevCraft {
         }
     }
     private void serverTick(ServerTickEvent.Post event) {
+        JevWorldData.get(event.getServer()).tickRespawns(event.getServer());
         if (persistenceReloadTicks >= 0 && --persistenceReloadTicks == 0) {
             persistenceReloadTicks = -1;
             verifyPersistenceReload(event.getServer());
@@ -181,14 +189,21 @@ public final class JevCraft {
         UUID owner = UUID.fromString("aa628850-ec31-4cc0-8d88-b9a3a13cd5d9");
         UUID admin = UUID.fromString("11548867-8593-497c-99a3-48bce967ce00");
         UUID grantPlayer = UUID.fromString("1cf589fd-ecda-4a65-8ab1-497b184387fe");
+        UUID respawnActor = UUID.fromString("d8199b62-5f13-4683-8bd4-c6318ec971eb");
         JevCompanion jev = null;
+        JevCompanion respawned = null;
         for (var entity : server.overworld().getAllEntities()) if (entity instanceof JevCompanion candidate && candidate.getUUID().equals(actor)) { jev = candidate; break; }
+        for (var entity : server.overworld().getAllEntities()) if (entity instanceof JevCompanion candidate && candidate.getUUID().equals(respawnActor)) { respawned = candidate; break; }
         if (jev == null) throw new IllegalStateException("persisted Jev was not restored in loaded spawn chunks");
+        if (respawned == null || !owner.equals(respawned.owner()) || !respawned.administrators().contains(admin)
+                || !"resume after restart".equals(respawned.currentGoal()) || respawned.recentChat().size() != 1)
+            throw new IllegalStateException("queued Jev did not respawn with durable identity after restart");
         JevWorldData data = JevWorldData.get(server);
         if (!owner.equals(jev.owner()) || !jev.administrators().contains(admin) || !"follow me".equals(jev.currentGoal())
                 || jev.inventory().getItem(0).getCount() != 7 || jev.recentChat().size() != 1 || Math.abs(jev.getHealth() - 13) > 0.01
                 || !"PersistJev".equals(data.name(actor)) || data.grant(grantPlayer) != JevWorldData.GrantState.DELIVERED
-                || !ForcedChunkManager.hasForcedChunks(server.overworld()))
+                || !ForcedChunkManager.hasForcedChunks(server.overworld()) || data.pendingRespawnCount() != 0
+                || !"RestartJev".equals(data.name(respawnActor)))
             throw new IllegalStateException("persisted Jev state did not round-trip");
         LOGGER.info("PERSISTENCE_RELOAD_PASS");
     }

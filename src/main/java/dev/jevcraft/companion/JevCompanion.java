@@ -180,7 +180,10 @@ public final class JevCompanion extends PathfinderMob {
     @Override protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean recentlyHit) {
         super.dropCustomDeathLoot(level, source, recentlyHit);
         for (ItemStack stack : inventory.removeAllItems()) if (!stack.isEmpty()) spawnAtLocation(stack);
-        JevWorldData.get(level.getServer()).unregister(getUUID());
+        CompoundTag respawnState = new CompoundTag(); addAdditionalSaveData(respawnState);
+        respawnState.putLong("RespawnFallbackPos", blockPosition().asLong());
+        long delay = Math.max(20, Math.min(12000, Long.getLong("jevcraft.respawnTicks", 100L)));
+        JevWorldData.get(level.getServer()).queueRespawn(getUUID(), respawnState, level.getGameTime() + delay);
     }
     @Override public void onRemovedFromLevel() {
         Entity.RemovalReason reason = getRemovalReason();
