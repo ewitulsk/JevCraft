@@ -54,6 +54,10 @@ public final class CompanionActionExecutor {
         if (!target.isAlive() || companion.distanceToSqr(target) > 16) return false;
         float health = target.getHealth(); interactions.attack(level, target, inventorySlot); return target.getHealth() < health;
     }
+    public InteractionResult interactEntity(ServerLevel level, Entity target, int inventorySlot) {
+        if (!target.isAlive() || target.level() != level || companion.distanceToSqr(target) > 16) return InteractionResult.FAIL;
+        return interactions.interactEntity(level, target, inventorySlot);
+    }
     public boolean depositStack(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         if (companion.distanceToSqr(hit.getLocation()) > 25) return false;
         return interactions.quickMoveToContainer(level, hit, inventorySlot);

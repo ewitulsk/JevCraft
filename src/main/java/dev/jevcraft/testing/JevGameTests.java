@@ -19,6 +19,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.level.block.state.properties.AttachFace;
@@ -270,6 +271,40 @@ public final class JevGameTests {
             int ingots=0;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.IRON_INGOT))ingots+=entity.inventory().getItem(i).getCount();
             helper.assertValueEqual(ingots,1,"furnace collection did not return exactly one iron ingot");
         });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 240)
+    public static void companionUsesSmokerAndBlastFurnaceMenus(GameTestHelper helper) {
+        BlockPos smokerPos=new BlockPos(3,1,2),blastPos=new BlockPos(2,1,3);helper.setBlock(smokerPos,Blocks.SMOKER);helper.setBlock(blastPos,Blocks.BLAST_FURNACE);
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(9,new ItemStack(Items.BEEF));entity.inventory().setItem(10,new ItemStack(Items.COAL));entity.inventory().setItem(11,new ItemStack(Items.RAW_IRON));entity.inventory().setItem(12,new ItemStack(Items.COAL));
+        BlockPos smokerAbsolute=helper.absolutePos(smokerPos),blastAbsolute=helper.absolutePos(blastPos);BlockHitResult smokerHit=new BlockHitResult(Vec3.atCenterOf(smokerAbsolute),Direction.UP,smokerAbsolute,false),blastHit=new BlockHitResult(Vec3.atCenterOf(blastAbsolute),Direction.UP,blastAbsolute,false);
+        helper.assertTrue(entity.actions().loadFurnace(helper.getLevel(),smokerHit,9,10),"smoker-specific menu did not accept food and fuel");helper.assertTrue(entity.actions().loadFurnace(helper.getLevel(),blastHit,11,12),"blast-furnace-specific menu did not accept ore and fuel");
+        helper.succeedWhen(()->{
+            helper.assertTrue(helper.getLevel().getBlockEntity(smokerAbsolute) instanceof AbstractFurnaceBlockEntity&&helper.getLevel().getBlockEntity(blastAbsolute) instanceof AbstractFurnaceBlockEntity,"specialized furnace block entity disappeared");
+            AbstractFurnaceBlockEntity smoker=(AbstractFurnaceBlockEntity)helper.getLevel().getBlockEntity(smokerAbsolute),blast=(AbstractFurnaceBlockEntity)helper.getLevel().getBlockEntity(blastAbsolute);
+            helper.assertTrue(smoker.getItem(2).is(Items.COOKED_BEEF)&&blast.getItem(2).is(Items.IRON_INGOT),"specialized normal ticking has not produced both outputs");
+            helper.assertTrue(entity.actions().collectFurnace(helper.getLevel(),smokerHit)&&entity.actions().collectFurnace(helper.getLevel(),blastHit),"specialized result collection failed");
+            int beef=0,iron=0;for(int i=0;i<entity.inventory().getContainerSize();i++){if(entity.inventory().getItem(i).is(Items.COOKED_BEEF))beef+=entity.inventory().getItem(i).getCount();if(entity.inventory().getItem(i).is(Items.IRON_INGOT))iron+=entity.inventory().getItem(i).getCount();}
+            helper.assertValueEqual(beef,1,"smoker output count");helper.assertValueEqual(iron,1,"blast furnace output count");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
+        first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));
+        helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),first,7).consumesAction(),"first animal rejected normal player interaction");
+        helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),second,7).consumesAction(),"second animal rejected normal player interaction");
+        helper.assertTrue(first.isInLove()&&second.isInLove(),"wheat interactions did not put both adult cows in love");
+        helper.assertTrue(entity.inventory().getItem(7).isEmpty(),"feeding did not consume exactly two wheat");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionOwnsLeadAfterNormalEntityCallback(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow cow=helper.spawn(EntityType.COW,new BlockPos(3,1,2));entity.inventory().setItem(8,new ItemStack(Items.LEAD));
+        helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),cow,8).consumesAction(),"lead interaction callback failed");
+        helper.assertTrue(cow.getLeashHolder()==entity,"lead remained attached to the temporary player context");
+        helper.assertTrue(entity.inventory().getItem(8).isEmpty(),"lead interaction did not consume the lead");helper.succeed();
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)

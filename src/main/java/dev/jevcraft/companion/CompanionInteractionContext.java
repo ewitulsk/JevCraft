@@ -8,15 +8,21 @@ import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.BlastFurnaceMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.SmokerMenu;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.SmokerBlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.Mth;
@@ -82,6 +88,19 @@ public final class CompanionInteractionContext {
         actor.attack(target);
         companion.inventory().setItem(slot, actor.getInventory().getItem(0).copy());
         actor.getInventory().setItem(0, ItemStack.EMPTY);
+    }
+
+    /** Runs the entity's ordinary player interaction callback, then transfers any new lead to the companion body. */
+    public InteractionResult interactEntity(ServerLevel level, Entity target, int slot) {
+        if (slot < 0 || slot >= companion.inventory().getContainerSize()) return InteractionResult.FAIL;
+        FakePlayer actor = player(level);
+        actor.getInventory().selected = 0;
+        actor.getInventory().setItem(0, companion.inventory().getItem(slot).copy());
+        InteractionResult result = actor.interactOn(target, InteractionHand.MAIN_HAND);
+        companion.inventory().setItem(slot, actor.getInventory().getItem(0).copy());
+        actor.getInventory().setItem(0, ItemStack.EMPTY);
+        if (target instanceof Mob mob && mob.getLeashHolder() == actor) mob.setLeashedTo(companion, true);
+        return result;
     }
 
     /** Transfers one complete stack through a real ChestMenu after normal block-use access succeeds. */
@@ -173,7 +192,7 @@ public final class CompanionInteractionContext {
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
         BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)){clearPlayer(actor);return false;}
-        FurnaceMenu menu=new FurnaceMenu(0,actor.getInventory(),furnace,new SimpleContainerData(4));int inputMenu=playerMenuSlot(menu,actor,inputSlot),fuelMenu=playerMenuSlot(menu,actor,fuelSlot);
+        AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);int inputMenu=playerMenuSlot(menu,actor,inputSlot),fuelMenu=playerMenuSlot(menu,actor,fuelSlot);
         int inputBefore=furnace.getItem(0).getCount(),fuelBefore=furnace.getItem(1).getCount();if(inputMenu>=0)menu.clicked(inputMenu,0,ClickType.QUICK_MOVE,actor);if(fuelMenu>=0)menu.clicked(fuelMenu,0,ClickType.QUICK_MOVE,actor);
         menu.removed(actor);syncFromPlayer(actor);boolean loaded=furnace.getItem(0).getCount()>inputBefore&&furnace.getItem(1).getCount()>fuelBefore;clearPlayer(actor);return loaded;
     }
@@ -183,8 +202,15 @@ public final class CompanionInteractionContext {
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
         BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
-        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);FurnaceMenu menu=new FurnaceMenu(0,actor.getInventory(),furnace,new SimpleContainerData(4));menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);
+        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
+    }
+
+    private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
+        SimpleContainerData data=new SimpleContainerData(4);
+        if(furnace instanceof SmokerBlockEntity)return new SmokerMenu(0,actor.getInventory(),furnace,data);
+        if(furnace instanceof BlastFurnaceBlockEntity)return new BlastFurnaceMenu(0,actor.getInventory(),furnace,data);
+        return new FurnaceMenu(0,actor.getInventory(),furnace,data);
     }
 
     private static int playerMenuSlot(net.minecraft.world.inventory.AbstractContainerMenu menu, FakePlayer actor, int inventorySlot) {
