@@ -3,7 +3,7 @@
 ## Automated
 
 - `gradlew test`: provider schema fixtures, permissions, exactly-once grants, chat isolation, memory privacy, inventory revisions, moving chunk bounds, parser behavior, stale-decision cancellation, and scheduling.
-- `gradlew runGameTestServer`: boots NeoForge 21.1.250 for Minecraft 1.21.1 and runs 10 in-world tests covering body attributes, persistence, bounded chat provenance, progressive mining, placement, combat, food, chest-menu transfer, crafting-menu callbacks, and immediate stop.
+- `gradlew runGameTestServer`: boots NeoForge 21.1.250 for Minecraft 1.21.1 and runs 11 in-world tests covering body attributes, persistence, bounded chat provenance, world roster/cap/grants, progressive mining, placement, combat, food, chest-menu transfer, crafting-menu callbacks, and immediate stop.
 - `gradlew build`: creates full and client-only artifacts.
 
 ## Opt-in live route

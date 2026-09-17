@@ -3,6 +3,7 @@ package dev.jevcraft.testing;
 import dev.jevcraft.JevCraft;
 import dev.jevcraft.companion.JevCompanion;
 import dev.jevcraft.companion.JevInferenceHost;
+import dev.jevcraft.companion.JevWorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -159,6 +160,26 @@ public final class JevGameTests {
         helper.assertValueEqual(restored.recentChat().size(), 32, "chat history did not persist");
         helper.assertTrue(restored.recentChat().get(0).authorized(), "authorization provenance did not persist");
         helper.assertValueEqual(restored.recentChat().get(0).sender(), sender, "authenticated sender UUID did not persist");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void worldRosterEnforcesTenAndUniqueNames(GameTestHelper helper) {
+        JevWorldData data = JevWorldData.get(helper.getLevel().getServer());
+        java.util.List<UUID> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            UUID id = UUID.randomUUID(); ids.add(id);
+            helper.assertTrue(data.register(id, "Jev"), "roster rejected slot " + i);
+            helper.assertTrue(data.name(id) != null, "roster did not assign a name");
+        }
+        helper.assertValueEqual(data.livingCount(), 10, "world roster count");
+        helper.assertTrue(!data.register(UUID.randomUUID(), "Overflow"), "world roster accepted an eleventh living Jev");
+        helper.assertValueEqual(ids.stream().map(data::name).map(String::toLowerCase).distinct().count(), 10L, "world roster names are not unique");
+        UUID player = UUID.randomUUID();
+        helper.assertValueEqual(data.grant(player), JevWorldData.GrantState.PENDING, "new grant state");
+        data.grantDelivered(player); data.grantConsumed(player);
+        helper.assertValueEqual(data.grant(player), JevWorldData.GrantState.CONSUMED, "consumed grant must never reissue");
+        ids.forEach(data::unregister);
         helper.succeed();
     }
 }

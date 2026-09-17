@@ -168,6 +168,7 @@ public final class JevCompanion extends PathfinderMob {
     @Override protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean recentlyHit) {
         super.dropCustomDeathLoot(level, source, recentlyHit);
         for (ItemStack stack : inventory.removeAllItems()) if (!stack.isEmpty()) spawnAtLocation(stack);
+        JevWorldData.get(level.getServer()).unregister(getUUID());
     }
     @Override public void onRemovedFromLevel() {
         if (!level().isClientSide && level() instanceof ServerLevel serverLevel && lastChunkX != Integer.MIN_VALUE)

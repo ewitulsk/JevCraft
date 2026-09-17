@@ -12,16 +12,18 @@ public final class JevSpawnEggItem extends Item {
     public JevSpawnEggItem(Properties properties) { super(properties); }
     @Override public InteractionResult useOn(UseOnContext context) {
         if (!(context.getLevel() instanceof ServerLevel level) || context.getPlayer() == null) return InteractionResult.SUCCESS;
-        long count = 0;
-        for (ServerLevel candidate : level.getServer().getAllLevels()) for (var entity : candidate.getAllEntities())
-            if (entity instanceof JevCompanion && entity.isAlive()) count++;
-        if (count >= 10) { context.getPlayer().displayClientMessage(Component.literal("The world already has ten living Jevs."), false); return InteractionResult.FAIL; }
+        JevWorldData roster = JevWorldData.get(level.getServer());
+        if (roster.livingCount() >= 10) { context.getPlayer().displayClientMessage(Component.literal("The world already has ten living Jevs."), false); return InteractionResult.FAIL; }
         JevCompanion entity = JevCraft.JEV.get().create(level, null, context.getClickedPos().relative(context.getClickedFace()), MobSpawnType.SPAWN_EGG, true, false);
         if (entity == null) return InteractionResult.FAIL;
         entity.setOwner(context.getPlayer().getUUID());
-        entity.setCustomName(Component.literal("Jev_" + entity.getStringUUID().substring(0, 6)));
+        if (!roster.register(entity.getUUID(), "Jev_" + entity.getStringUUID().substring(0, 6))) { entity.discard(); return InteractionResult.FAIL; }
+        entity.setCustomName(Component.literal(roster.name(entity.getUUID())));
         entity.setCustomNameVisible(true);
-        if (!context.getPlayer().getAbilities().instabuild) context.getItemInHand().shrink(1);
+        if (!context.getPlayer().getAbilities().instabuild) {
+            context.getItemInHand().shrink(1);
+            JevWorldData.get(level.getServer()).grantConsumed(context.getPlayer().getUUID());
+        }
         return InteractionResult.CONSUME;
     }
 }

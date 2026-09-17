@@ -13,7 +13,7 @@ Status is deliberately split so an API surface is never presented as autonomous 
 | Combat / food | Dedicated player attack context; damageable body; food callbacks | GameTests for damage and food consumption | No | Vanilla only |
 | Personal inventory and death drops | 36-slot companion inventory | Save/load GameTest; transaction contracts | No | Vanilla stacks only |
 | Containers and workstations | Revision transaction core plus real chest and crafting menu sessions | Chest deposit and single-ingredient crafting GameTests | No | Vanilla chest/table proof only |
-| Spawn egg and starter grant | Yes | Server boot; deterministic roster contracts | N/A | Vanilla inventory |
+| Spawn egg and starter grant | World SavedData roster, unique names, ten-living cap, pending/delivered/consumed grants | JUnit roster contracts and world-roster GameTest | N/A | Vanilla inventory |
 | Owner/admin permissions | Owner and operator command checks | JUnit contracts | N/A | Command/chat mods untested |
 | Public/private chat routing | Server public-chat fan-out and permission-checked `/jev msg`; bounded persisted provenance | JUnit contracts and persistence GameTest | No | Native `/msg` name routing remains open |
 | Moving ticking chunks | 5×5 region per living companion | Compiles and ticket controller registers | No long-run benchmark | Vanilla server only |

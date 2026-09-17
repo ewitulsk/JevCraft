@@ -5,6 +5,7 @@ import com.mojang.logging.LogUtils;
 import dev.jevcraft.companion.JevCompanion;
 import dev.jevcraft.companion.JevSpawnEggItem;
 import dev.jevcraft.companion.MovingChunkTickets;
+import dev.jevcraft.companion.JevWorldData;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -19,6 +20,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.registries.*;
 import net.minecraft.core.registries.Registries;
 import org.slf4j.Logger;
@@ -44,6 +46,7 @@ public final class JevCraft {
         modBus.addListener(MovingChunkTickets::register);
         NeoForge.EVENT_BUS.addListener(this::commands);
         NeoForge.EVENT_BUS.addListener(this::login);
+        NeoForge.EVENT_BUS.addListener(this::playerTick);
         NeoForge.EVENT_BUS.addListener(this::chat);
         LOGGER.info("JevCraft initialized; credentials are read only from host configuration");
     }
@@ -56,12 +59,18 @@ public final class JevCraft {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) event.accept(JEV_EGG.get());
     }
     private void login(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player) || player.isCreative()) return;
-        var data = player.getPersistentData();
-        if (data.getBoolean("jevcraft:starter_egg_delivered")) return;
+        if (event.getEntity() instanceof ServerPlayer player) deliverStarterEgg(player);
+    }
+    private void playerTick(PlayerTickEvent.Post event) {
+        if (event.getEntity() instanceof ServerPlayer player && player.tickCount % 20 == 0) deliverStarterEgg(player);
+    }
+    private void deliverStarterEgg(ServerPlayer player) {
+        if (player.isCreative()) return;
+        JevWorldData data = JevWorldData.get(player.getServer());
+        if (data.grant(player.getUUID()) != JevWorldData.GrantState.PENDING) return;
         ItemStack egg = new ItemStack(JEV_EGG.get());
         if (player.getInventory().add(egg)) {
-            data.putBoolean("jevcraft:starter_egg_delivered", true);
+            data.grantDelivered(player.getUUID());
             player.displayClientMessage(Component.literal("You received your one-time Jev Spawn Egg."), false);
         }
     }
