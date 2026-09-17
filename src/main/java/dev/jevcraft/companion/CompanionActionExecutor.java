@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -122,6 +123,15 @@ public final class CompanionActionExecutor {
     }
     public boolean activateBeacon(ServerLevel level,BlockHitResult hit,int paymentSlot,Holder<MobEffect> primary){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.activateBeacon(level,hit,paymentSlot,primary);
+    }
+    public boolean moveInventoryStack(ServerLevel level,int sourceSlot,int destinationSlot,int amount){
+        return interactions.moveInventoryStack(level,sourceSlot,destinationSlot,amount);
+    }
+    public boolean dropInventoryStack(ServerLevel level,int sourceSlot,int amount){
+        return interactions.dropInventoryStack(level,sourceSlot,amount);
+    }
+    public boolean equipInventoryStack(ServerLevel level,int sourceSlot,EquipmentSlot equipmentSlot){
+        return interactions.equipInventoryStack(level,sourceSlot,equipmentSlot);
     }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;

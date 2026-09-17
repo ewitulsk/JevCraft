@@ -212,6 +212,23 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionSplitsMergesSwapsAndDropsThroughInventoryMenu(GameTestHelper helper){
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.COBBLESTONE,10));entity.inventory().setItem(1,new ItemStack(Items.COBBLESTONE,60));entity.inventory().setItem(2,new ItemStack(Items.DIRT,3));entity.inventory().setItem(3,new ItemStack(Items.SAND,2));entity.inventory().setItem(4,new ItemStack(Items.COBBLESTONE,64));
+        helper.assertTrue(entity.actions().moveInventoryStack(helper.getLevel(),0,1,4),"partial merge failed: "+entity.actions().lastInteractionFailure());helper.assertValueEqual(entity.inventory().getItem(0).getCount(),6,"partial merge source count");helper.assertValueEqual(entity.inventory().getItem(1).getCount(),64,"partial merge destination count");
+        helper.assertTrue(entity.actions().moveInventoryStack(helper.getLevel(),0,5,2),"split into empty slot failed: "+entity.actions().lastInteractionFailure());helper.assertValueEqual(entity.inventory().getItem(0).getCount(),4,"split source count");helper.assertValueEqual(entity.inventory().getItem(5).getCount(),2,"split destination count");
+        helper.assertTrue(entity.actions().moveInventoryStack(helper.getLevel(),2,3,3),"full-stack swap failed: "+entity.actions().lastInteractionFailure());helper.assertTrue(entity.inventory().getItem(2).is(Items.SAND)&&entity.inventory().getItem(2).getCount()==2&&entity.inventory().getItem(3).is(Items.DIRT)&&entity.inventory().getItem(3).getCount()==3,"swap did not preserve both stacks");
+        helper.assertTrue(!entity.actions().moveInventoryStack(helper.getLevel(),0,4,1),"full destination accepted an impossible merge");helper.assertValueEqual(entity.inventory().getItem(0).getCount(),4,"rejected merge changed source");helper.assertValueEqual(entity.inventory().getItem(4).getCount(),64,"rejected merge changed destination");
+        helper.assertTrue(entity.actions().dropInventoryStack(helper.getLevel(),0,2),"exact inventory drop failed: "+entity.actions().lastInteractionFailure());helper.assertValueEqual(entity.inventory().getItem(0).getCount(),2,"drop source count");helper.runAfterDelay(2,()->{int dropped=helper.getLevel().getEntitiesOfClass(ItemEntity.class,new net.minecraft.world.phys.AABB(entity.blockPosition()).inflate(4)).stream().filter(item->item.getItem().is(Items.COBBLESTONE)).mapToInt(item->item.getItem().getCount()).sum();helper.assertValueEqual(dropped,2,"menu drop did not create exactly two world items");helper.succeed();});
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionSwapsArmorAndOffhandThroughInventoryMenu(GameTestHelper helper){
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(6,new ItemStack(Items.IRON_HELMET));entity.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD,new ItemStack(Items.LEATHER_HELMET));entity.inventory().setItem(7,new ItemStack(Items.SHIELD));
+        helper.assertTrue(entity.actions().equipInventoryStack(helper.getLevel(),6,net.minecraft.world.entity.EquipmentSlot.HEAD),"helmet swap failed: "+entity.actions().lastInteractionFailure());helper.assertTrue(entity.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(Items.IRON_HELMET),"new helmet was not authoritative");helper.assertTrue(entity.inventory().getItem(6).is(Items.LEATHER_HELMET),"old helmet was not returned to its source slot");
+        helper.assertTrue(entity.actions().equipInventoryStack(helper.getLevel(),7,net.minecraft.world.entity.EquipmentSlot.OFFHAND),"offhand equip failed: "+entity.actions().lastInteractionFailure());helper.assertTrue(entity.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND).is(Items.SHIELD),"shield was not placed in authoritative offhand");helper.assertTrue(entity.inventory().getItem(7).isEmpty(),"offhand equip duplicated the shield");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionPlacesAndCollectsWaterWithBucketCallbacks(GameTestHelper helper) {
         BlockPos support=new BlockPos(3,0,2),water=support.above(); helper.setBlock(support,Blocks.STONE);
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.inventory().setItem(0,new ItemStack(Items.WATER_BUCKET));

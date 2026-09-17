@@ -11,6 +11,7 @@ import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.inventory.ChestMenu;
@@ -344,6 +345,30 @@ public final class CompanionInteractionContext {
         BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BeaconBlockEntity beacon)){lastFailure="access_or_block access="+access+" block="+(blockEntity==null?"null":blockEntity.getClass().getSimpleName());actor.closeContainer();clearPlayer(actor);return false;}boolean opened=actor.containerMenu instanceof BeaconMenu;BeaconMenu menu=opened?(BeaconMenu)actor.containerMenu:new BeaconMenu(0,actor.getInventory(),((BeaconBlockEntityAccessor)beacon).jevcraft$dataAccess(),ContainerLevelAccess.create(level,hit.getBlockPos()));if(menu.getLevels()<1){lastFailure="unpowered levels="+menu.getLevels();if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}int sourceMenu=playerMenuSlot(menu,actor,paymentSlot);if(sourceMenu<0){lastFailure="missing_payment_slot";if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(sourceMenu,0,ClickType.QUICK_MOVE,actor);if(!menu.hasPayment()){lastFailure="payment_not_routed";if(opened)actor.closeContainer();else menu.removed(actor);clearPlayer(actor);return false;}menu.updateEffects(java.util.Optional.of(primary),java.util.Optional.empty());boolean selected=primary.equals(menu.getPrimaryEffect())&&!menu.hasPayment();if(opened)actor.closeContainer();else menu.removed(actor);syncFromPlayer(actor);boolean exact=countItem(companion.inventory(),payment)==payment.getCount()-1;if(!selected||!exact)lastFailure="selection_or_payment selected="+selected+" remaining="+countItem(companion.inventory(),payment);clearPlayer(actor);return selected&&exact;
     }
 
+    /** Moves an exact quantity through the player's real inventory menu, including merge, split, and full-stack swap semantics. */
+    public boolean moveInventoryStack(ServerLevel level,int sourceSlot,int destinationSlot,int amount){
+        lastFailure="";int size=companion.inventory().getContainerSize();if(sourceSlot<0||sourceSlot>=size||destinationSlot<0||destinationSlot>=size||sourceSlot==destinationSlot||amount<=0){lastFailure="invalid_input";return false;}
+        ItemStack sourceBefore=companion.inventory().getItem(sourceSlot).copy(),destinationBefore=companion.inventory().getItem(destinationSlot).copy();if(sourceBefore.isEmpty()||amount>sourceBefore.getCount()){lastFailure="insufficient_source";return false;}
+        boolean compatible=destinationBefore.isEmpty()||ItemStack.isSameItemSameComponents(sourceBefore,destinationBefore);int destinationLimit=destinationBefore.isEmpty()?sourceBefore.getMaxStackSize():destinationBefore.getMaxStackSize();if(compatible&&amount>destinationLimit-destinationBefore.getCount()){lastFailure="destination_full";return false;}if(!compatible&&amount!=sourceBefore.getCount()){lastFailure="partial_swap";return false;}
+        FakePlayer actor=player(level);syncToPlayer(actor);var menu=actor.inventoryMenu;menu.setCarried(ItemStack.EMPTY);int sourceMenu=playerMenuSlot(menu,actor,sourceSlot),destinationMenu=playerMenuSlot(menu,actor,destinationSlot);if(sourceMenu<0||destinationMenu<0){lastFailure="missing_menu_slot";clearPlayer(actor);return false;}
+        menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);if(amount==sourceBefore.getCount()){menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);if(!compatible)menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);}else{for(int i=0;i<amount;i++)menu.clicked(destinationMenu,1,ClickType.PICKUP,actor);menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);}boolean cursorEmpty=menu.getCarried().isEmpty();syncFromPlayer(actor);
+        ItemStack sourceAfter=companion.inventory().getItem(sourceSlot),destinationAfter=companion.inventory().getItem(destinationSlot);boolean exact;if(!compatible)exact=ItemStack.isSameItemSameComponents(sourceAfter,destinationBefore)&&sourceAfter.getCount()==destinationBefore.getCount()&&ItemStack.isSameItemSameComponents(destinationAfter,sourceBefore)&&destinationAfter.getCount()==sourceBefore.getCount();else exact=(sourceBefore.getCount()==amount?sourceAfter.isEmpty():ItemStack.isSameItemSameComponents(sourceAfter,sourceBefore)&&sourceAfter.getCount()==sourceBefore.getCount()-amount)&&ItemStack.isSameItemSameComponents(destinationAfter,sourceBefore)&&destinationAfter.getCount()==destinationBefore.getCount()+amount;
+        if(!cursorEmpty||!exact)lastFailure="inventory_transfer cursor="+menu.getCarried()+" source="+sourceAfter+" destination="+destinationAfter;menu.setCarried(ItemStack.EMPTY);clearPlayer(actor);return cursorEmpty&&exact;
+    }
+
+    /** Drops an exact quantity through inventory-menu outside clicks so normal item entities are produced. */
+    public boolean dropInventoryStack(ServerLevel level,int sourceSlot,int amount){
+        lastFailure="";if(sourceSlot<0||sourceSlot>=companion.inventory().getContainerSize()||amount<=0){lastFailure="invalid_input";return false;}ItemStack before=companion.inventory().getItem(sourceSlot).copy();if(before.isEmpty()||amount>before.getCount()){lastFailure="insufficient_source";return false;}
+        FakePlayer actor=player(level);syncToPlayer(actor);var menu=actor.inventoryMenu;menu.setCarried(ItemStack.EMPTY);int sourceMenu=playerMenuSlot(menu,actor,sourceSlot);if(sourceMenu<0){lastFailure="missing_menu_slot";clearPlayer(actor);return false;}menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);for(int i=0;i<amount;i++)menu.clicked(-999,1,ClickType.PICKUP,actor);if(!menu.getCarried().isEmpty())menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);boolean cursorEmpty=menu.getCarried().isEmpty();syncFromPlayer(actor);ItemStack after=companion.inventory().getItem(sourceSlot);boolean exact=(before.getCount()==amount?after.isEmpty():ItemStack.isSameItemSameComponents(before,after)&&after.getCount()==before.getCount()-amount);if(!cursorEmpty||!exact)lastFailure="inventory_drop cursor="+menu.getCarried()+" source="+after;menu.setCarried(ItemStack.EMPTY);clearPlayer(actor);return cursorEmpty&&exact;
+    }
+
+    /** Equips or swaps one stack through the armor/offhand slots of the real player inventory menu. */
+    public boolean equipInventoryStack(ServerLevel level,int sourceSlot,EquipmentSlot equipmentSlot){
+        lastFailure="";if(sourceSlot<0||sourceSlot>=companion.inventory().getContainerSize()||equipmentSlot==null||equipmentSlot==EquipmentSlot.MAINHAND){lastFailure="invalid_input";return false;}ItemStack sourceBefore=companion.inventory().getItem(sourceSlot).copy(),equipmentBefore=companion.getItemBySlot(equipmentSlot).copy();if(sourceBefore.isEmpty()){lastFailure="empty_source";return false;}
+        FakePlayer actor=player(level);syncToPlayer(actor);actor.setItemSlot(equipmentSlot,equipmentBefore.copy());var menu=actor.inventoryMenu;menu.setCarried(ItemStack.EMPTY);int sourceMenu=playerMenuSlot(menu,actor,sourceSlot),equipmentIndex=equipmentInventoryIndex(equipmentSlot),equipmentMenu=playerMenuSlot(menu,actor,equipmentIndex);if(sourceMenu<0||equipmentMenu<0){lastFailure="missing_menu_slot";clearPlayer(actor);return false;}
+        menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);menu.clicked(equipmentMenu,0,ClickType.PICKUP,actor);if(!menu.getCarried().isEmpty())menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);boolean cursorEmpty=menu.getCarried().isEmpty();syncFromPlayer(actor);ItemStack equipped=actor.getItemBySlot(equipmentSlot).copy();companion.setItemSlot(equipmentSlot,equipped);ItemStack sourceAfter=companion.inventory().getItem(sourceSlot);boolean exact=ItemStack.isSameItemSameComponents(equipped,sourceBefore)&&equipped.getCount()==sourceBefore.getCount()&&(equipmentBefore.isEmpty()?sourceAfter.isEmpty():ItemStack.isSameItemSameComponents(sourceAfter,equipmentBefore)&&sourceAfter.getCount()==equipmentBefore.getCount());if(!cursorEmpty||!exact)lastFailure="equipment_transfer cursor="+menu.getCarried()+" source="+sourceAfter+" equipped="+equipped;menu.setCarried(ItemStack.EMPTY);clearPlayer(actor);return cursorEmpty&&exact;
+    }
+
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
         SimpleContainerData data=new SimpleContainerData(4);
         if(furnace instanceof SmokerBlockEntity)return new SmokerMenu(0,actor.getInventory(),furnace,data);
@@ -358,6 +383,7 @@ public final class CompanionInteractionContext {
         }
         return -1;
     }
+    private static int equipmentInventoryIndex(EquipmentSlot slot){return switch(slot){case FEET->36;case LEGS->37;case CHEST->38;case HEAD->39;case OFFHAND->40;default->-1;};}
 
     private int firstEmptySlot(int except) {
         for (int i = 0; i < companion.inventory().getContainerSize(); i++)
