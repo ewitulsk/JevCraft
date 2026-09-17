@@ -148,6 +148,32 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionMountsAndDismountsVanillaVehicle(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));
+        var minecart=helper.spawn(EntityType.MINECART,new BlockPos(3,1,2));
+        helper.assertTrue(entity.actions().mount(minecart),"companion could not mount reachable vanilla minecart");
+        helper.assertTrue(entity.getVehicle()==minecart&&minecart.hasPassenger(entity),"vanilla riding relationship was not established");
+        helper.assertTrue(entity.actions().dismount(),"companion could not dismount vanilla minecart");
+        helper.assertTrue(entity.getVehicle()==null&&!minecart.hasPassenger(entity),"vanilla riding relationship survived dismount");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void twoCompanionInteractionInventoriesStayIsolated(GameTestHelper helper) {
+        BlockPos supportA=new BlockPos(3,0,2),supportB=new BlockPos(3,0,5); helper.setBlock(supportA,Blocks.STONE); helper.setBlock(supportB,Blocks.STONE);
+        JevCompanion first=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)),second=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,5));
+        first.inventory().setItem(0,new ItemStack(Items.COBBLESTONE,2)); second.inventory().setItem(0,new ItemStack(Items.DIRT,3));
+        BlockPos absoluteA=helper.absolutePos(supportA),absoluteB=helper.absolutePos(supportB);
+        helper.assertTrue(first.actions().place(helper.getLevel(),new BlockHitResult(Vec3.atCenterOf(absoluteA),Direction.UP,absoluteA,false),0).consumesAction(),"first placement failed");
+        helper.assertTrue(second.actions().place(helper.getLevel(),new BlockHitResult(Vec3.atCenterOf(absoluteB),Direction.UP,absoluteB,false),0).consumesAction(),"second placement failed");
+        helper.assertTrue(helper.getLevel().getBlockState(absoluteA.above()).is(Blocks.COBBLESTONE)&&helper.getLevel().getBlockState(absoluteB.above()).is(Blocks.DIRT),"interaction contexts crossed block choices");
+        helper.assertValueEqual(first.inventory().getItem(0).getCount(),1,"first inventory consumption was not isolated");
+        helper.assertValueEqual(second.inventory().getItem(0).getCount(),2,"second inventory consumption was not isolated");
+        helper.assertTrue(first.inventory().getItem(0).is(Items.COBBLESTONE)&&second.inventory().getItem(0).is(Items.DIRT),"interaction contexts crossed inventory identities");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionDepositsThroughRealChestMenu(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(3, 1, 2);
         helper.setBlock(chestPos, Blocks.CHEST);

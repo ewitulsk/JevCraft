@@ -5,6 +5,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -51,6 +52,13 @@ public final class CompanionActionExecutor {
         MovingChunkTickets.prepare(level, companion, target.getX() >> 4, target.getZ() >> 4, 2);
         companion.teleportTo(level, destination.x, destination.y, destination.z, java.util.Set.of(), companion.getYRot(), companion.getXRot());
         return companion.distanceToSqr(destination) < .01;
+    }
+    public boolean mount(Entity vehicle) {
+        return vehicle.isAlive()&&vehicle.level()==companion.level()&&!companion.isPassenger()&&companion.distanceToSqr(vehicle)<=16&&companion.startRiding(vehicle);
+    }
+    public boolean dismount() {
+        if(!companion.isPassenger()) return false;
+        companion.stopRiding(); return !companion.isPassenger();
     }
 
     public Result tick(ServerLevel level) {
