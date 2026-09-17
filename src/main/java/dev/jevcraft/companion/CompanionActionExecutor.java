@@ -108,6 +108,12 @@ public final class CompanionActionExecutor {
     public boolean smith(ServerLevel level,BlockHitResult hit,int templateSlot,int baseSlot,int additionSlot){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.smith(level,hit,templateSlot,baseSlot,additionSlot);
     }
+    public boolean loadBrewingStand(ServerLevel level,BlockHitResult hit,int bottleSlot,int ingredientSlot,int fuelSlot){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.loadBrewingStand(level,hit,bottleSlot,ingredientSlot,fuelSlot);
+    }
+    public boolean collectBrewingStand(ServerLevel level,BlockHitResult hit,int standSlot){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.collectBrewingStand(level,hit,standSlot);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);

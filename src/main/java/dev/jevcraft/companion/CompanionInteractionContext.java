@@ -14,6 +14,7 @@ import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
 import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.inventory.BlastFurnaceMenu;
+import net.minecraft.world.inventory.BrewingStandMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -30,6 +31,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
+import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.entity.SmokerBlockEntity;
 import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
@@ -222,7 +224,7 @@ public final class CompanionInteractionContext {
         FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
-        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)){clearPlayer(actor);return false;}
+        actor.closeContainer();BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)){clearPlayer(actor);return false;}
         AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);int inputMenu=playerMenuSlot(menu,actor,inputSlot),fuelMenu=playerMenuSlot(menu,actor,fuelSlot);
         int inputBefore=furnace.getItem(0).getCount(),fuelBefore=furnace.getItem(1).getCount();if(inputMenu>=0)menu.clicked(inputMenu,0,ClickType.QUICK_MOVE,actor);if(fuelMenu>=0)menu.clicked(fuelMenu,0,ClickType.QUICK_MOVE,actor);
         menu.removed(actor);syncFromPlayer(actor);boolean loaded=furnace.getItem(0).getCount()>inputBefore&&furnace.getItem(1).getCount()>fuelBefore;clearPlayer(actor);return loaded;
@@ -232,7 +234,7 @@ public final class CompanionInteractionContext {
         FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=emptySlot();if(handSlot<0){clearPlayer(actor);return false;}actor.getInventory().selected=handSlot<9?handSlot:0;
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
-        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
+        actor.closeContainer();BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
         ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
     }
@@ -308,6 +310,18 @@ public final class CompanionInteractionContext {
         SmithingMenu menu=new SmithingMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int[] sources={playerMenuSlot(menu,actor,templateSlot),playerMenuSlot(menu,actor,baseSlot),playerMenuSlot(menu,actor,additionSlot)};int destinationMenu=playerMenuSlot(menu,actor,destination);if(sources[0]<0||sources[1]<0||sources[2]<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
         for(int i=0;i<3;i++){menu.clicked(sources[i],0,ClickType.PICKUP,actor);menu.clicked(i,1,ClickType.PICKUP,actor);menu.clicked(sources[i],0,ClickType.PICKUP,actor);}int resultSlot=menu.getResultSlot();if(!menu.getSlot(resultSlot).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(resultSlot).getItem().copy();menu.clicked(resultSlot,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean exact=countItem(companion.inventory(),template)==template.getCount()-1&&countItem(companion.inventory(),base)==base.getCount()-1&&countItem(companion.inventory(),addition)==addition.getCount()-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
+    }
+
+    public boolean loadBrewingStand(ServerLevel level,BlockHitResult hit,int bottleSlot,int ingredientSlot,int fuelSlot){
+        if(bottleSlot<0||ingredientSlot<0||fuelSlot<0||bottleSlot==ingredientSlot||bottleSlot==fuelSlot||ingredientSlot==fuelSlot||bottleSlot>=companion.inventory().getContainerSize()||ingredientSlot>=companion.inventory().getContainerSize()||fuelSlot>=companion.inventory().getContainerSize())return false;
+        Item bottle=companion.inventory().getItem(bottleSlot).getItem(),ingredient=companion.inventory().getItem(ingredientSlot).getItem(),fuel=companion.inventory().getItem(fuelSlot).getItem();
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);actor.closeContainer();BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BrewingStandBlockEntity stand)){clearPlayer(actor);return false;}
+        BrewingStandMenu menu=new BrewingStandMenu(0,actor.getInventory(),stand,new SimpleContainerData(2));int[] sourceSlots={bottleSlot,ingredientSlot,fuelSlot};for(int source:sourceSlots){int menuSlot=playerMenuSlot(menu,actor,source);if(menuSlot<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(menuSlot,0,ClickType.QUICK_MOVE,actor);}menu.removed(actor);syncFromPlayer(actor);boolean loaded=stand.getItem(0).is(bottle)&&stand.getItem(3).is(ingredient)&&stand.getItem(4).is(fuel);clearPlayer(actor);return loaded;
+    }
+
+    public boolean collectBrewingStand(ServerLevel level,BlockHitResult hit,int standSlot){
+        if(standSlot<0||standSlot>2)return false;FakePlayer actor=player(level);syncToPlayer(actor);int destination=emptySlot();if(destination<0){clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);actor.closeContainer();BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof BrewingStandBlockEntity stand)||stand.getItem(standSlot).isEmpty()){clearPlayer(actor);return false;}
+        BrewingStandMenu menu=new BrewingStandMenu(0,actor.getInventory(),stand,new SimpleContainerData(2));int destinationMenu=playerMenuSlot(menu,actor,destination);if(destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}ItemStack result=stand.getItem(standSlot).copy();int before=countItem(actor.getInventory(),result);menu.clicked(standSlot,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);boolean exact=stand.getItem(standSlot).isEmpty()&&countItem(companion.inventory(),result)>=before+result.getCount();clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
