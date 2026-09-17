@@ -7,6 +7,7 @@
 - `gradlew build`: creates full and client-only artifacts.
 - `scripts/Test-HiddenTakeover.ps1`: launches only project-owned processes and an unfocused hidden GLFW client against a loopback dedicated server. Its default deterministic typed decision fixture isolates client mechanics; `-LiveGateway` requires a live Vercel/Jev decision. Paired evidence requires normal multiplayer block removal, item pickup, goal completion, and released synthetic keys.
 - `scripts/Test-Persistence.ps1`: creates state in a dedicated-server world, stops through the normal save path, boots the same world again, and mechanically verifies entity and world SavedData fields before another orderly stop.
+- `scripts/Test-RemoteTicking.ps1`: boots a dedicated server with no players, places a Jev and furnace 40 chunks from spawn, and requires both the entity and furnace to keep ticking through a registered 5×5 ticking region.
 
 ## Opt-in live route
 
@@ -20,4 +21,4 @@ The direct TypeSafe route has deterministic fake-endpoint coverage but no live r
 
 ## Not yet established
 
-Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, offline-owner operation, the live direct-TypeSafe route, and one/five/ten-agent TPS/cost benchmarks remain open. See `CAPABILITY_MATRIX.md`.
+Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, broader offline-owner task completion, the live direct-TypeSafe route, and one/five/ten-agent TPS/cost benchmarks remain open. See `CAPABILITY_MATRIX.md`.

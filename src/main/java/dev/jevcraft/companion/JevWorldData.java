@@ -28,6 +28,7 @@ public final class JevWorldData extends SavedData {
     }
     public void unregister(UUID id) { if (living.remove(id) != null) setDirty(); }
     public int livingCount() { return living.size(); }
+    public boolean containsLiving(UUID id) { return living.containsKey(id); }
     public String name(UUID id) { return living.get(id); }
     public boolean nameInUse(String name, UUID except) {
         return living.entrySet().stream().anyMatch(e -> !e.getKey().equals(except) && e.getValue().equalsIgnoreCase(name));

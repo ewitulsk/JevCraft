@@ -15,17 +15,20 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.*;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.common.world.chunk.ForcedChunkManager;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.CommandEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -52,6 +55,9 @@ public final class JevCraft {
     private boolean hiddenServerPassed;
     private int persistenceShutdownTicks = -1;
     private int persistenceReloadTicks = -1;
+    private int remoteTickTestTicks = -1;
+    private static final UUID REMOTE_TEST_ACTOR = UUID.fromString("089f86c5-1cfa-48bb-a28a-da209b531ff5");
+    private BlockPos remoteTestFurnace;
 
     public JevCraft(IEventBus modBus) {
         ENTITIES.register(modBus); ITEMS.register(modBus);
@@ -61,6 +67,7 @@ public final class JevCraft {
         NeoForge.EVENT_BUS.addListener(this::commands);
         NeoForge.EVENT_BUS.addListener(this::command);
         NeoForge.EVENT_BUS.addListener(this::login);
+        NeoForge.EVENT_BUS.addListener(this::entityJoined);
         NeoForge.EVENT_BUS.addListener(this::playerTick);
         NeoForge.EVENT_BUS.addListener(this::chat);
         NeoForge.EVENT_BUS.addListener(this::serverStarted);
@@ -86,6 +93,10 @@ public final class JevCraft {
                 LOGGER.info("HIDDEN_TAKEOVER_SERVER_READY");
             } else deliverStarterEgg(player);
         }
+    }
+    private void entityJoined(EntityJoinLevelEvent event) {
+        if (event.getEntity() instanceof JevCompanion jev && event.getLevel() instanceof net.minecraft.server.level.ServerLevel level)
+            jev.activateChunkTickets(level);
     }
     private void playerTick(PlayerTickEvent.Post event) {
         if (event.getEntity() instanceof ServerPlayer player) {
@@ -122,6 +133,21 @@ public final class JevCraft {
             persistenceShutdownTicks = 40;
         } else if (phase.equals("reload")) {
             persistenceReloadTicks = 40;
+        } else if (phase.equals("remote")) {
+            BlockPos spawn = level.getSharedSpawnPos();
+            BlockPos body = new BlockPos(spawn.getX() + 40 * 16, spawn.getY() + 1, spawn.getZ());
+            level.getChunkAt(body);
+            JevCompanion jev = JEV.get().create(level); if (jev == null) throw new IllegalStateException("remote fixture entity creation failed");
+            jev.setUUID(REMOTE_TEST_ACTOR); jev.setOwner(owner); jev.setCustomName(Component.literal("RemoteJev"));
+            jev.moveTo(body.getX() + .5, body.getY(), body.getZ() + .5, 0, 0);
+            if (!level.addFreshEntity(jev)) throw new IllegalStateException("remote fixture entity add failed");
+            if (!JevWorldData.get(server).register(REMOTE_TEST_ACTOR, "RemoteJev")) throw new IllegalStateException("remote fixture roster add failed");
+            remoteTestFurnace = body.offset(2, 0, 0);
+            level.setBlockAndUpdate(remoteTestFurnace, Blocks.FURNACE.defaultBlockState());
+            if (!(level.getBlockEntity(remoteTestFurnace) instanceof AbstractFurnaceBlockEntity furnace)) throw new IllegalStateException("remote furnace missing");
+            furnace.setItem(0, new ItemStack(Items.IRON_ORE)); furnace.setItem(1, new ItemStack(Items.COAL));
+            remoteTickTestTicks = 260;
+            LOGGER.info("REMOTE_TICK_CREATE_READY");
         }
     }
     private void serverTick(ServerTickEvent.Post event) {
@@ -130,10 +156,25 @@ public final class JevCraft {
             verifyPersistenceReload(event.getServer());
             persistenceShutdownTicks = 40;
         }
+        if (remoteTickTestTicks >= 0 && --remoteTickTestTicks == 0) {
+            remoteTickTestTicks = -1;
+            verifyRemoteTicking(event.getServer());
+            persistenceShutdownTicks = 40;
+        }
         if (persistenceShutdownTicks < 0 || --persistenceShutdownTicks > 0) return;
         persistenceShutdownTicks = -1;
         LOGGER.info("PERSISTENCE_TEST_STOPPING");
         event.getServer().halt(false);
+    }
+    private void verifyRemoteTicking(net.minecraft.server.MinecraftServer server) {
+        if (!server.getPlayerList().getPlayers().isEmpty()) throw new IllegalStateException("remote test unexpectedly had a player");
+        JevCompanion jev = null;
+        for (var entity : server.overworld().getAllEntities()) if (entity instanceof JevCompanion candidate && candidate.getUUID().equals(REMOTE_TEST_ACTOR)) { jev = candidate; break; }
+        if (jev == null || jev.tickCount < 200) throw new IllegalStateException("remote Jev did not keep ticking without players");
+        if (!(server.overworld().getBlockEntity(remoteTestFurnace) instanceof AbstractFurnaceBlockEntity furnace)
+                || !furnace.getItem(2).is(Items.IRON_INGOT)) throw new IllegalStateException("remote furnace did not complete while no players were present");
+        if (!ForcedChunkManager.hasForcedChunks(server.overworld())) throw new IllegalStateException("remote ticking ticket was not retained");
+        LOGGER.info("REMOTE_TICK_PASS entityTicks={} furnaceOutput={}", jev.tickCount, furnace.getItem(2).getCount());
     }
     private void verifyPersistenceReload(net.minecraft.server.MinecraftServer server) {
         UUID actor = UUID.fromString("79eaf327-3320-4b72-9b45-e2666f089c42");
@@ -146,7 +187,8 @@ public final class JevCraft {
         JevWorldData data = JevWorldData.get(server);
         if (!owner.equals(jev.owner()) || !jev.administrators().contains(admin) || !"follow me".equals(jev.currentGoal())
                 || jev.inventory().getItem(0).getCount() != 7 || jev.recentChat().size() != 1 || Math.abs(jev.getHealth() - 13) > 0.01
-                || !"PersistJev".equals(data.name(actor)) || data.grant(grantPlayer) != JevWorldData.GrantState.DELIVERED)
+                || !"PersistJev".equals(data.name(actor)) || data.grant(grantPlayer) != JevWorldData.GrantState.DELIVERED
+                || !ForcedChunkManager.hasForcedChunks(server.overworld()))
             throw new IllegalStateException("persisted Jev state did not round-trip");
         LOGGER.info("PERSISTENCE_RELOAD_PASS");
     }

@@ -47,14 +47,16 @@ public final class JevCompanion extends PathfinderMob {
         super.tick();
         if (!level().isClientSide && level() instanceof ServerLevel serverLevel) {
             if (tickCount % 1200 == 0 && !currentGoal.isBlank()) food = Math.max(0, food - 1);
-            int cx = chunkPosition().x, cz = chunkPosition().z;
-            if (cx != lastChunkX || cz != lastChunkZ) {
-                MovingChunkTickets.move(serverLevel, this, lastChunkX, lastChunkZ, cx, cz, 2);
-                lastChunkX = cx; lastChunkZ = cz;
-            }
+            activateChunkTickets(serverLevel);
             CompanionActionExecutor.Result result = actions.tick(serverLevel);
             if (result == CompanionActionExecutor.Result.IDLE) applySimpleGoal(serverLevel);
         }
+    }
+    public void activateChunkTickets(ServerLevel level) {
+        int cx = chunkPosition().x, cz = chunkPosition().z;
+        if (cx == lastChunkX && cz == lastChunkZ) return;
+        MovingChunkTickets.move(level, this, lastChunkX, lastChunkZ, cx, cz, 2);
+        lastChunkX = cx; lastChunkZ = cz;
     }
     private void applySimpleGoal(ServerLevel level) {
         if (currentGoal.isBlank() || owner == null) return;
@@ -181,7 +183,9 @@ public final class JevCompanion extends PathfinderMob {
         JevWorldData.get(level.getServer()).unregister(getUUID());
     }
     @Override public void onRemovedFromLevel() {
-        if (!level().isClientSide && level() instanceof ServerLevel serverLevel && lastChunkX != Integer.MIN_VALUE)
+        Entity.RemovalReason reason = getRemovalReason();
+        if (!level().isClientSide && level() instanceof ServerLevel serverLevel && lastChunkX != Integer.MIN_VALUE
+                && (reason == null || !reason.shouldSave()))
             MovingChunkTickets.release(serverLevel, this, lastChunkX, lastChunkZ, 2);
         super.onRemovedFromLevel();
     }

@@ -16,8 +16,8 @@ Status is deliberately split so an API surface is never presented as autonomous 
 | Spawn egg and starter grant | World SavedData roster, unique names, ten-living cap, pending/delivered/consumed grants | JUnit roster contracts and world-roster GameTest | N/A | Vanilla inventory |
 | Owner/admin permissions | UUID owner plus persisted administrator set; `/jev admin` owner/operator management | JUnit contracts; serialization and command GameTests | N/A | Command-permission mods untested |
 | Public/private chat routing | Server public-chat fan-out; native `/msg`/`tell`/`w` exact-name routing; `/jev msg` fallback; bounded persisted provenance | Permission, coexistence, and persistence GameTests | No | Third-party chat mods untested |
-| Moving ticking chunks | 5×5 region per living companion | Compiles and ticket controller registers | No long-run benchmark | Vanilla server only |
-| Persistence / restart | Entity owner/admins, goal, health, food, inventory, recent chat, roster, and grant state | Serialization GameTests plus two-boot dedicated-server round trip | N/A | Vanilla saves only |
+| Moving ticking chunks | 5×5 region per living companion; join-time bootstrap; saved tickets; orphan validation | No-player dedicated-server test at 40 chunks: entity ticks and furnace smelts | No long-run/ten-agent benchmark | Vanilla server only |
+| Persistence / restart | Entity owner/admins, goal, health, food, inventory, recent chat, roster, grant state, and ticking tickets | Serialization GameTests plus two-boot dedicated-server round trip | N/A | Vanilla saves only |
 | Building / portals / mounts / creative / text | Not implemented | No | No | Unknown |
 
 This table is the source of truth for release claims. The repository is currently an executable feasibility slice, not completion of every Stage 2–7 gameplay gate in `JEVCRAFT_PLAN.md`.

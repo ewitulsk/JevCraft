@@ -25,4 +25,4 @@ Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, `/j
 
 ## Current maturity
 
-This repository is an executable feasibility implementation. It proves the dual provider contract, live Vercel evaluation transport, live companion and hidden-client visible-log choices, stale-response safety, two artifact shapes, restart persistence, and real companion mining, placement, combat, eating, chest deposit, and crafting paths. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.
+This repository is an executable feasibility implementation. It proves the dual provider contract, live Vercel evaluation transport, live companion and hidden-client visible-log choices, stale-response safety, two artifact shapes, restart persistence, no-player remote entity/block-entity ticking, and real companion mining, placement, combat, eating, chest deposit, and crafting paths. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.

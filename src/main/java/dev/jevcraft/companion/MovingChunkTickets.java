@@ -6,8 +6,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
 import net.neoforged.neoforge.common.world.chunk.TicketController;
 
+import java.util.UUID;
+
 public final class MovingChunkTickets {
-    private static final TicketController CONTROLLER = new TicketController(ResourceLocation.fromNamespaceAndPath(JevCraft.MOD_ID, "companions"));
+    private static final TicketController CONTROLLER = new TicketController(
+            ResourceLocation.fromNamespaceAndPath(JevCraft.MOD_ID, "companions"),
+            (level, tickets) -> {
+                JevWorldData roster = JevWorldData.get(level.getServer());
+                for (UUID owner : tickets.getEntityTickets().keySet()) if (!roster.containsLiving(owner)) tickets.removeAllTickets(owner);
+            });
     private MovingChunkTickets() {}
     public static void register(RegisterTicketControllersEvent event) { event.register(CONTROLLER); }
     public static void move(ServerLevel level, JevCompanion owner, int oldX, int oldZ, int newX, int newZ, int radius) {
