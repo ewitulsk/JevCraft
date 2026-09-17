@@ -63,6 +63,7 @@ class CoreContractsTest {
         assertEquals(GoalParser.Kind.DEPOSIT, goal.kind()); assertEquals(32, goal.quantity()); assertEquals(2, goal.clauses().size());
         assertEquals("the chest by my bed", goal.destination());
         assertEquals("hello", new GoalParser().parse("write \"hello\" on the sign").subject());
+        assertEquals(4, new GoalParser().parse("collect four logs").quantity());
     }
 
     @Test void memoriesCannotLeakPrivateMessages() {

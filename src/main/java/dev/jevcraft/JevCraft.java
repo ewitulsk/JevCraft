@@ -16,6 +16,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.registries.*;
@@ -43,6 +44,7 @@ public final class JevCraft {
         modBus.addListener(MovingChunkTickets::register);
         NeoForge.EVENT_BUS.addListener(this::commands);
         NeoForge.EVENT_BUS.addListener(this::login);
+        NeoForge.EVENT_BUS.addListener(this::chat);
         LOGGER.info("JevCraft initialized; credentials are read only from host configuration");
     }
 
@@ -80,7 +82,27 @@ public final class JevCraft {
                             if (!companion.canCommand(sender)) { context.getSource().sendFailure(Component.literal("You are not authorized for that Jev.")); return 0; }
                             companion.acceptGoal(StringArgumentType.getString(context, "instruction"));
                             context.getSource().sendSuccess(() -> Component.literal(companion.getName().getString() + ": goal accepted"), false); return 1;
+                        }))))
+                .then(Commands.literal("msg").then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("message", StringArgumentType.greedyString()).executes(context -> {
+                            var companion = find(context.getSource().getServer(), StringArgumentType.getString(context, "name"));
+                            if (companion == null) { context.getSource().sendFailure(Component.literal("No loaded Jev has that name.")); return 0; }
+                            ServerPlayer sender = context.getSource().getPlayerOrException();
+                            String message = StringArgumentType.getString(context, "message");
+                            boolean authorized = companion.canCommand(sender);
+                            companion.observeChat(sender.getUUID(), message, authorized, true);
+                            if (!authorized) { context.getSource().sendFailure(Component.literal(companion.getName().getString() + ": you are not authorized to assign goals")); return 0; }
+                            companion.acceptGoal(message);
+                            context.getSource().sendSuccess(() -> Component.literal(companion.getName().getString() + ": I accepted your goal."), false);
+                            return 1;
                         })))));
+    }
+    private void chat(ServerChatEvent event) {
+        ServerPlayer sender = event.getPlayer();
+        String text = event.getRawText();
+        for (var level : sender.getServer().getAllLevels()) for (var entity : level.getAllEntities())
+            if (entity instanceof JevCompanion jev)
+                jev.observeChat(sender.getUUID(), text, jev.canCommand(sender), false);
     }
     private static JevCompanion find(net.minecraft.server.MinecraftServer server, String name) {
         String target = name.toLowerCase(Locale.ROOT);

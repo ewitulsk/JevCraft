@@ -19,6 +19,8 @@ Requires Java 21. On Windows:
 
 See `docs/CAPABILITY_MATRIX.md` and `docs/VERIFICATION.md` for the difference between implemented mechanics, deterministic verification, and live Jev gameplay evidence.
 
+Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, and the private-message diagnostic fallback `/jev msg <name> <message>`. Only the owner or a server operator may assign or stop goals. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
+
 ## Current maturity
 
-This repository is an executable feasibility slice. It proves the dual provider contract, live Vercel evaluation transport, stale-response safety, two artifact shapes, and a real registered companion in NeoForge GameTests. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.
+This repository is an executable feasibility implementation. It proves the dual provider contract, live Vercel evaluation transport and visible-log choice, stale-response safety, two artifact shapes, and real companion mining, placement, combat, eating, chest deposit, and crafting paths in NeoForge GameTests. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.

@@ -8,16 +8,16 @@ Status is deliberately split so an API surface is never presented as autonomous 
 | Cancellation, freshness, ten-controller scheduling | Yes | JUnit contracts | Not measured at ten actors | N/A |
 | Goal parsing and typed goal families | Partial | JUnit contracts | Not measured | Vanilla labels only |
 | Local takeover instruction/stop UI | Yes in client artifact | Build-time only | Not measured in a real client | Unknown |
-| Ground movement | Follow goal for companion | Server entity boot only | Not measured | Vanilla only |
-| Mining / placement / pickup | Not yet wired to body adapter | No | No | Unknown |
-| Combat | Vanilla damageable body only | Spawn/health GameTest | No | Unknown |
+| Ground movement | Follow/navigation and mining approach | Server entity boot; mining approach exercised | Not measured end-to-end | Vanilla only |
+| Mining / placement / pickup | Dedicated per-Jev player context; progressive mining; normal use placement; authoritative pickup | GameTests for mining, placement and stack consumption | Vercel-selected visible-log mining passed | Vanilla only |
+| Combat / food | Dedicated player attack context; damageable body; food callbacks | GameTests for damage and food consumption | No | Vanilla only |
 | Personal inventory and death drops | 36-slot companion inventory | Save/load GameTest; transaction contracts | No | Vanilla stacks only |
-| Containers and workstations | Transaction state machine only | JUnit contracts | No | Unknown |
+| Containers and workstations | Revision transaction core plus real chest and crafting menu sessions | Chest deposit and single-ingredient crafting GameTests | No | Vanilla chest/table proof only |
 | Spawn egg and starter grant | Yes | Server boot; deterministic roster contracts | N/A | Vanilla inventory |
 | Owner/admin permissions | Owner and operator command checks | JUnit contracts | N/A | Command/chat mods untested |
-| Public/private chat routing | Core bounded fan-out only | JUnit contracts | No | Not integrated with `/msg` yet |
+| Public/private chat routing | Server public-chat fan-out and permission-checked `/jev msg`; bounded persisted provenance | JUnit contracts and persistence GameTest | No | Native `/msg` name routing remains open |
 | Moving ticking chunks | 5×5 region per living companion | Compiles and ticket controller registers | No long-run benchmark | Vanilla server only |
-| Persistence / restart | Entity owner, goal, food, inventory | Serialization GameTest | No restart fixture | Vanilla saves only |
+| Persistence / restart | Entity owner, goal, food, inventory and recent chat | Serialization GameTests | No restart fixture | Vanilla saves only |
 | Building / portals / mounts / creative / text | Not implemented | No | No | Unknown |
 
 This table is the source of truth for release claims. The repository is currently an executable feasibility slice, not completion of every Stage 2–7 gameplay gate in `JEVCRAFT_PLAN.md`.

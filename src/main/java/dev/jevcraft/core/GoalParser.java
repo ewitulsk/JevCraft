@@ -8,6 +8,10 @@ public final class GoalParser {
     public record Goal(Kind kind, int quantity, String subject, String destination, List<String> clauses) {}
     private static final Pattern QUANTITY = Pattern.compile("(?<!\\w)(\\d{1,4})(?!\\w)");
     private static final Pattern QUOTED = Pattern.compile("\"([^\"]{1,256})\"");
+    private static final Map<String, Integer> NUMBER_WORDS = Map.ofEntries(
+            Map.entry("one", 1), Map.entry("two", 2), Map.entry("three", 3), Map.entry("four", 4), Map.entry("five", 5),
+            Map.entry("six", 6), Map.entry("seven", 7), Map.entry("eight", 8), Map.entry("nine", 9), Map.entry("ten", 10),
+            Map.entry("sixteen", 16), Map.entry("thirty-two", 32), Map.entry("thirty two", 32), Map.entry("sixty-four", 64), Map.entry("sixty four", 64));
     public Goal parse(String input) {
         String normalized = Objects.requireNonNull(input).strip();
         if (normalized.isEmpty()) return new Goal(Kind.CLARIFY, 0, "", "", List.of());
@@ -25,7 +29,9 @@ public final class GoalParser {
                 : contains(lower, "explore", "find ") ? Kind.EXPLORE
                 : contains(lower, "wait") ? Kind.WAIT : Kind.INTERACT;
         Matcher quantity = QUANTITY.matcher(normalized);
-        int amount = quantity.find() ? Integer.parseInt(quantity.group(1)) : 1;
+        int amount = quantity.find() ? Integer.parseInt(quantity.group(1)) : NUMBER_WORDS.entrySet().stream()
+                .filter(entry -> lower.matches(".*\\b" + Pattern.quote(entry.getKey()) + "\\b.*"))
+                .map(Map.Entry::getValue).findFirst().orElse(1);
         Matcher quoted = QUOTED.matcher(normalized);
         String subject = quoted.find() ? quoted.group(1) : normalized;
         String destination = "";
