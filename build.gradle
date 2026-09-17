@@ -29,8 +29,13 @@ neoForge {
         hiddenClient {
             client(); gameDirectory = file(findProperty('jevcraftClientDir') ?: 'runs/hidden-client')
             systemProperty 'jevcraft.hiddenClient', 'true'; systemProperty 'jevcraft.hiddenClientTest', 'true'
+            systemProperty 'jevcraft.hiddenLiveGateway', (findProperty('jevcraftHiddenLive') ?: 'false').toString()
             systemProperty 'jevcraft.testPort', (findProperty('jevcraftTestPort') ?: '25575').toString()
             jvmArgument '-Xmx2G'
+        }
+        persistenceServer {
+            server(); gameDirectory = file(findProperty('jevcraftPersistenceDir') ?: 'runs/persistence-server')
+            programArgument '--nogui'; systemProperty 'jevcraft.persistenceTest', (findProperty('jevcraftPersistencePhase') ?: '').toString(); jvmArgument '-Xmx2G'
         }
     }
     mods { jevcraft { sourceSet sourceSets.main } }

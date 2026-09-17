@@ -21,8 +21,8 @@ Both editions include the same takeover controller: press F8 for the non-pausing
 
 See `docs/CAPABILITY_MATRIX.md` and `docs/VERIFICATION.md` for the difference between implemented mechanics, deterministic verification, and live Jev gameplay evidence.
 
-Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, and the private-message diagnostic fallback `/jev msg <name> <message>`. Owners and persisted administrators may assign or stop goals; an in-game access-management command remains to be added. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
+Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, `/jev admin <name> add|remove <player>`, and the diagnostic fallback `/jev msg <name> <message>`. Native `/msg`, `/tell`, and `/w` route to an exact loaded Jev name while preserving ordinary player targets. Owners and persisted administrators may assign or stop goals; only owners or server operators manage administrators. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
 
 ## Current maturity
 
-This repository is an executable feasibility implementation. It proves the dual provider contract, live Vercel evaluation transport and visible-log choice, stale-response safety, two artifact shapes, and real companion mining, placement, combat, eating, chest deposit, and crafting paths in NeoForge GameTests. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.
+This repository is an executable feasibility implementation. It proves the dual provider contract, live Vercel evaluation transport, live companion and hidden-client visible-log choices, stale-response safety, two artifact shapes, restart persistence, and real companion mining, placement, combat, eating, chest deposit, and crafting paths. It does **not** yet satisfy the plan's complete vanilla action surface or release gates; those gaps are kept explicit in the capability matrix.

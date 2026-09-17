@@ -8,6 +8,7 @@ import dev.jevcraft.companion.JevSpawnEggItem;
 import dev.jevcraft.companion.MovingChunkTickets;
 import dev.jevcraft.companion.JevWorldData;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
@@ -21,17 +22,21 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.CommandEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.registries.*;
 import net.minecraft.core.registries.Registries;
 import org.slf4j.Logger;
 
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 @Mod(JevCraft.MOD_ID)
 public final class JevCraft {
@@ -45,6 +50,8 @@ public final class JevCraft {
     public static final DeferredItem<JevSpawnEggItem> JEV_EGG = ITEMS.registerItem("jev_spawn_egg", JevSpawnEggItem::new,
             new Item.Properties().stacksTo(1).rarity(Rarity.RARE));
     private boolean hiddenServerPassed;
+    private int persistenceShutdownTicks = -1;
+    private int persistenceReloadTicks = -1;
 
     public JevCraft(IEventBus modBus) {
         ENTITIES.register(modBus); ITEMS.register(modBus);
@@ -52,9 +59,12 @@ public final class JevCraft {
         modBus.addListener(this::creativeTab);
         modBus.addListener(MovingChunkTickets::register);
         NeoForge.EVENT_BUS.addListener(this::commands);
+        NeoForge.EVENT_BUS.addListener(this::command);
         NeoForge.EVENT_BUS.addListener(this::login);
         NeoForge.EVENT_BUS.addListener(this::playerTick);
         NeoForge.EVENT_BUS.addListener(this::chat);
+        NeoForge.EVENT_BUS.addListener(this::serverStarted);
+        NeoForge.EVENT_BUS.addListener(this::serverTick);
         if (FMLEnvironment.dist == Dist.CLIENT) TakeoverRuntime.initialize(modBus);
         LOGGER.info("JevCraft initialized; credentials are read only from host configuration");
     }
@@ -94,6 +104,52 @@ public final class JevCraft {
             player.displayClientMessage(Component.literal("You received your one-time Jev Spawn Egg."), false);
         }
     }
+    private void serverStarted(ServerStartedEvent event) {
+        String phase = System.getProperty("jevcraft.persistenceTest", ""); if (phase.isBlank()) return;
+        var server = event.getServer(); var level = server.overworld();
+        UUID actor = UUID.fromString("79eaf327-3320-4b72-9b45-e2666f089c42");
+        UUID owner = UUID.fromString("aa628850-ec31-4cc0-8d88-b9a3a13cd5d9");
+        UUID admin = UUID.fromString("11548867-8593-497c-99a3-48bce967ce00");
+        UUID grantPlayer = UUID.fromString("1cf589fd-ecda-4a65-8ab1-497b184387fe");
+        if (phase.equals("create")) {
+            JevCompanion jev = JEV.get().create(level); if (jev == null) throw new IllegalStateException("persistence fixture entity creation failed");
+            jev.setUUID(actor); jev.setCustomName(Component.literal("PersistJev")); jev.setOwner(owner); jev.addAdministrator(admin);
+            jev.acceptGoal("follow me"); jev.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 7)); jev.observeChat(owner, "remember this", true, true); jev.setHealth(13);
+            BlockPos spawn = level.getSharedSpawnPos(); jev.moveTo(spawn.getX()+.5, spawn.getY()+1, spawn.getZ()+.5, 0, 0);
+            if (!level.addFreshEntity(jev)) throw new IllegalStateException("persistence fixture entity add failed");
+            JevWorldData data=JevWorldData.get(server); if(!data.register(actor,"PersistJev"))throw new IllegalStateException("persistence fixture roster add failed"); data.grant(grantPlayer); data.grantDelivered(grantPlayer);
+            LOGGER.info("PERSISTENCE_CREATE_READY");
+            persistenceShutdownTicks = 40;
+        } else if (phase.equals("reload")) {
+            persistenceReloadTicks = 40;
+        }
+    }
+    private void serverTick(ServerTickEvent.Post event) {
+        if (persistenceReloadTicks >= 0 && --persistenceReloadTicks == 0) {
+            persistenceReloadTicks = -1;
+            verifyPersistenceReload(event.getServer());
+            persistenceShutdownTicks = 40;
+        }
+        if (persistenceShutdownTicks < 0 || --persistenceShutdownTicks > 0) return;
+        persistenceShutdownTicks = -1;
+        LOGGER.info("PERSISTENCE_TEST_STOPPING");
+        event.getServer().halt(false);
+    }
+    private void verifyPersistenceReload(net.minecraft.server.MinecraftServer server) {
+        UUID actor = UUID.fromString("79eaf327-3320-4b72-9b45-e2666f089c42");
+        UUID owner = UUID.fromString("aa628850-ec31-4cc0-8d88-b9a3a13cd5d9");
+        UUID admin = UUID.fromString("11548867-8593-497c-99a3-48bce967ce00");
+        UUID grantPlayer = UUID.fromString("1cf589fd-ecda-4a65-8ab1-497b184387fe");
+        JevCompanion jev = null;
+        for (var entity : server.overworld().getAllEntities()) if (entity instanceof JevCompanion candidate && candidate.getUUID().equals(actor)) { jev = candidate; break; }
+        if (jev == null) throw new IllegalStateException("persisted Jev was not restored in loaded spawn chunks");
+        JevWorldData data = JevWorldData.get(server);
+        if (!owner.equals(jev.owner()) || !jev.administrators().contains(admin) || !"follow me".equals(jev.currentGoal())
+                || jev.inventory().getItem(0).getCount() != 7 || jev.recentChat().size() != 1 || Math.abs(jev.getHealth() - 13) > 0.01
+                || !"PersistJev".equals(data.name(actor)) || data.grant(grantPlayer) != JevWorldData.GrantState.DELIVERED)
+            throw new IllegalStateException("persisted Jev state did not round-trip");
+        LOGGER.info("PERSISTENCE_RELOAD_PASS");
+    }
     private void commands(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("jev")
                 .then(Commands.literal("stop").then(Commands.argument("name", StringArgumentType.word()).executes(context -> {
@@ -125,6 +181,54 @@ public final class JevCraft {
                             context.getSource().sendSuccess(() -> Component.literal(companion.getName().getString() + ": I accepted your goal."), false);
                             return 1;
                         })))));
+        event.getDispatcher().register(Commands.literal("jev").then(Commands.literal("admin")
+                .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.literal("add").then(Commands.argument("player", EntityArgument.player()).executes(context -> changeAdmin(context, true))))
+                        .then(Commands.literal("remove").then(Commands.argument("player", EntityArgument.player()).executes(context -> changeAdmin(context, false)))))));
+        event.getDispatcher().register(Commands.literal("msg")
+                .then(Commands.argument("jevName", StringArgumentType.word())
+                        .suggests((context, builder) -> { for (JevCompanion jev : companions(context.getSource().getServer())) builder.suggest(jev.getName().getString()); return builder.buildFuture(); })
+                        .then(Commands.argument("message", StringArgumentType.greedyString()).executes(context -> directMessage(context)))));
+    }
+    private int changeAdmin(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context, boolean add)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        JevCompanion companion = find(context.getSource().getServer(), StringArgumentType.getString(context, "name"));
+        if (companion == null) return 0;
+        ServerPlayer sender = context.getSource().getPlayerOrException();
+        if (!companion.canManageAccess(sender)) { context.getSource().sendFailure(Component.literal("Only the owner or a server operator can manage Jev administrators.")); return 0; }
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+        boolean changed = add ? companion.addAdministrator(target.getUUID()) : companion.removeAdministrator(target.getUUID());
+        context.getSource().sendSuccess(() -> Component.literal((add ? "Added " : "Removed ") + target.getGameProfile().getName() + " as administrator."), false);
+        return changed ? 1 : 0;
+    }
+    private int directMessage(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        JevCompanion companion = find(context.getSource().getServer(), StringArgumentType.getString(context, "jevName"));
+        if (companion == null) return 0;
+        ServerPlayer sender = context.getSource().getPlayerOrException(); String message = StringArgumentType.getString(context, "message");
+        boolean authorized = companion.canCommand(sender); companion.observeChat(sender.getUUID(), message, authorized, true);
+        if (!authorized) { context.getSource().sendFailure(Component.literal(companion.getName().getString() + ": you are not authorized to assign goals")); return 0; }
+        companion.acceptGoal(message); context.getSource().sendSuccess(() -> Component.literal(companion.getName().getString() + ": I accepted your goal."), false); return 1;
+    }
+    private void command(CommandEvent event) {
+        String input = event.getParseResults().getReader().getString();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("^(?:msg|tell|w)\\s+(\\S+)\\s+(.+)$", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(input);
+        if (!matcher.matches()) return;
+        var source = event.getParseResults().getContext().getSource();
+        JevCompanion companion = find(source.getServer(), matcher.group(1));
+        if (companion == null) return;
+        event.setCanceled(true);
+        ServerPlayer sender;
+        try { sender = source.getPlayerOrException(); } catch (com.mojang.brigadier.exceptions.CommandSyntaxException ignored) { source.sendFailure(Component.literal("Only players can message a Jev.")); return; }
+        String message = matcher.group(2); boolean authorized = companion.canCommand(sender);
+        companion.observeChat(sender.getUUID(), message, authorized, true);
+        if (!authorized) { source.sendFailure(Component.literal(companion.getName().getString() + ": you are not authorized to assign goals")); return; }
+        companion.acceptGoal(message); source.sendSuccess(() -> Component.literal(companion.getName().getString() + ": I accepted your goal."), false);
+    }
+    private static Iterable<JevCompanion> companions(net.minecraft.server.MinecraftServer server) {
+        java.util.List<JevCompanion> result = new java.util.ArrayList<>();
+        for (var level : server.getAllLevels()) for (var entity : level.getAllEntities()) if (entity instanceof JevCompanion jev) result.add(jev);
+        return result;
     }
     private void chat(ServerChatEvent event) {
         ServerPlayer sender = event.getPlayer();

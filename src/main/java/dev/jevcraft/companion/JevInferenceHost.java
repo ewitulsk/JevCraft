@@ -52,6 +52,7 @@ public final class JevInferenceHost {
             inFlight.remove(companion.getUUID(), token);
             if (failure != null) { JevCraft.LOGGER.debug("Jev decision failed for {}: {}", companion.getUUID(), failure.toString()); return; }
             if (!companion.isAlive() || companion.isRemoved() || companion.goalVersion() != goalVersion || companion.level() != level) return;
+            JevCraft.LOGGER.info("JEV_LIVE_DECISION provider={} model={} latencyMs={}", response.provider(), response.model(), response.latency().toMillis());
             Answer answer = response.answers().get("action");
             if (answer instanceof Answer.Choice choice) {
                 BlockPos selected = candidates.get(choice.choice());

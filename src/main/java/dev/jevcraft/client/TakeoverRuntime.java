@@ -56,7 +56,7 @@ public final class TakeoverRuntime {
         NeoForge.EVENT_BUS.addListener(TakeoverRuntime::tick);
         String route = value("JEVCRAFT_PROVIDER", "vercel_gateway");
         String key = value(route.equals("typesafe_direct") ? "TYPESAFE_API_KEY" : "AI_GATEWAY_API_KEY", "");
-        if (Boolean.getBoolean("jevcraft.hiddenClientTest")) provider = fixedTestProvider();
+        if (Boolean.getBoolean("jevcraft.hiddenClientTest") && !Boolean.getBoolean("jevcraft.hiddenLiveGateway")) provider = fixedTestProvider();
         else provider = key.isBlank() || route.equals("disabled") ? null
                 : route.equals("typesafe_direct") ? JsonInferenceProvider.typesafe(key) : JsonInferenceProvider.vercel(key);
     }
@@ -145,10 +145,11 @@ public final class TakeoverRuntime {
             }
             Answer answer = response.answers().get("action");
             if (answer instanceof Answer.Choice choice) {
+                LOGGER.info("TAKEOVER_DECISION provider={} model={} latencyMs={} choice={}", response.provider(), response.model(), response.latency().toMillis(), choice.choice());
                 BlockPos selected = positions.get(choice.choice());
                 if (selected != null && minecraft.level.getBlockState(selected).is(BlockTags.LOGS) && canSee(minecraft, selected)) {
                     target = selected; status = "Mining " + relative(minecraft.player, selected);
-                } else status = "Jev chose to wait";
+                } else { nextRequestTick=minecraft.player.tickCount+20; status = "Jev chose to wait"; }
             }
         }));
     }

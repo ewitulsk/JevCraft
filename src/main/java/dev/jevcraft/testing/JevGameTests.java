@@ -16,6 +16,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -181,6 +182,27 @@ public final class JevGameTests {
         data.grantDelivered(player); data.grantConsumed(player);
         helper.assertValueEqual(data.grant(player), JevWorldData.GrantState.CONSUMED, "consumed grant must never reissue");
         ids.forEach(data::unregister);
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void nativeMessageRoutesByJevNameAndChecksAuthority(GameTestHelper helper) {
+        ServerPlayer sender = helper.makeMockServerPlayerInLevel();
+        JevCompanion entity = helper.spawn(JevCraft.JEV.get(), new BlockPos(2, 1, 2));
+        entity.setCustomName(net.minecraft.network.chat.Component.literal("JevMsgTest")); entity.setOwner(sender.getUUID());
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev admin JevMsgTest add test-mock-player");
+        helper.assertTrue(entity.administrators().contains(sender.getUUID()), "owner could not add a UUID administrator");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "msg JevMsgTest follow me");
+        helper.assertValueEqual(entity.currentGoal(), "follow me", "native /msg did not route to the named Jev");
+        helper.assertTrue(entity.recentChat().get(entity.recentChat().size()-1).privateMessage(), "private message provenance missing");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev admin JevMsgTest remove test-mock-player");
+        helper.assertTrue(!entity.administrators().contains(sender.getUUID()), "owner could not remove a UUID administrator");
+        entity.stopNow(); entity.setOwner(UUID.randomUUID());
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "msg JevMsgTest mine logs");
+        helper.assertTrue(entity.currentGoal().isEmpty(), "unauthorized native /msg became an executable goal");
+        int observations = entity.recentChat().size();
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "msg test-mock-player ordinary player message");
+        helper.assertValueEqual(entity.recentChat().size(), observations, "ordinary player /msg was intercepted as a Jev message");
         helper.succeed();
     }
 }

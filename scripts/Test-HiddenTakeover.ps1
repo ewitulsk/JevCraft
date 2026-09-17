@@ -1,4 +1,4 @@
-param([int]$Port = 25575)
+param([int]$Port = 25575, [switch]$LiveGateway)
 $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $artifact = Join-Path $root ('artifacts\hidden-takeover-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
@@ -23,13 +23,17 @@ try {
     $deadline=[DateTime]::UtcNow.AddSeconds(120); $serverLog=Join-Path $serverDir 'logs\latest.log'
     while([DateTime]::UtcNow -lt $deadline){if($server.process.HasExited){throw "server exited $($server.process.ExitCode)"};if((Test-Path $serverLog)-and((Get-Content $serverLog -Raw)-match 'Done \(')){break};Start-Sleep -Milliseconds 500}
     if(!(Test-Path $serverLog)-or((Get-Content $serverLog -Raw)-notmatch 'Done \(')){throw 'server startup timed out'}
-    $client=Start-Owned 'runHiddenClient' @("-PjevcraftClientDir=$clientDir","-PjevcraftTestPort=$Port") 'client'; $owned+=$client
+    $clientProperties=@("-PjevcraftClientDir=$clientDir","-PjevcraftTestPort=$Port")
+    if($LiveGateway){if([string]::IsNullOrWhiteSpace($env:AI_GATEWAY_API_KEY)){throw 'AI_GATEWAY_API_KEY is required for -LiveGateway'};$clientProperties+="-PjevcraftHiddenLive=true"}
+    $client=Start-Owned 'runHiddenClient' $clientProperties 'client'; $owned+=$client
     if(!$client.process.WaitForExit(180000)){throw 'hidden client timed out'}
     if($client.process.ExitCode -ne 0){throw "hidden client exited $($client.process.ExitCode)"}
     $clientLog=Get-Content (Join-Path $clientDir 'logs\latest.log') -Raw; $serverText=Get-Content $serverLog -Raw
     if($clientLog -notmatch 'HIDDEN_TAKEOVER_CLIENT_PASS'){throw 'client pass evidence missing'}
     if($serverText -notmatch 'HIDDEN_TAKEOVER_SERVER_PASS'){throw 'server pass evidence missing'}
-    @{status='PASS';artifact=$artifact;clientEvidence='HIDDEN_TAKEOVER_CLIENT_PASS';serverEvidence='HIDDEN_TAKEOVER_SERVER_PASS';finishedUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content (Join-Path $artifact 'result.json')
+    $decisionCount=[regex]::Matches($clientLog,'TAKEOVER_DECISION provider=').Count
+    if($LiveGateway -and $decisionCount -lt 1){throw 'live gateway decision evidence missing'}
+    @{status='PASS';mode=$(if($LiveGateway){'live_gateway'}else{'deterministic_fixture'});liveDecisionCount=$decisionCount;artifact=$artifact;clientEvidence='HIDDEN_TAKEOVER_CLIENT_PASS';serverEvidence='HIDDEN_TAKEOVER_SERVER_PASS';finishedUtc=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json | Set-Content (Join-Path $artifact 'result.json')
     Write-Output "HIDDEN_TAKEOVER_PASS artifact=$artifact"
 } finally {
     foreach($item in $owned){
