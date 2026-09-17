@@ -88,7 +88,7 @@ public final class JevGameTests {
         JevCompanion original = helper.spawn(JevCraft.JEV.get(), new BlockPos(2, 1, 2));
         original.setOwner(owner); original.addAdministrator(administrator); original.acceptGoal("follow me"); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 4));
         original.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET)); original.setExperience(7, 91, .4f);
-        original.setOperatorTeleportAllowed(true); original.setRespawnPoint(helper.getLevel().dimension(), helper.absolutePos(new BlockPos(4, 1, 4)), 45);
+        original.setOperatorTeleportAllowed(true);original.setCreativeMode(true); original.setRespawnPoint(helper.getLevel().dimension(), helper.absolutePos(new BlockPos(4, 1, 4)), 45);
         CompoundTag saved = new CompoundTag(); original.addAdditionalSaveData(saved);
         JevCompanion restored = JevCraft.JEV.get().create(helper.getLevel());
         helper.assertTrue(restored != null, "registered companion type did not create");
@@ -100,7 +100,7 @@ public final class JevGameTests {
         helper.assertTrue(restored.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(Items.IRON_HELMET), "equipment persistence");
         helper.assertValueEqual(restored.experienceLevel(), 7, "experience level persistence"); helper.assertValueEqual(restored.totalExperience(), 91, "total experience persistence");
         helper.assertTrue(Math.abs(restored.experienceProgress() - .4f) < .001f, "experience progress persistence");
-        helper.assertTrue(restored.operatorTeleportAllowed(), "operator teleport flag persistence"); helper.assertValueEqual(restored.respawnDimension(), helper.getLevel().dimension(), "spawn dimension persistence");
+        helper.assertTrue(restored.operatorTeleportAllowed(), "operator teleport flag persistence");helper.assertTrue(restored.creativeMode(),"operator creative flag persistence"); helper.assertValueEqual(restored.respawnDimension(), helper.getLevel().dimension(), "spawn dimension persistence");
         original.stopNow(); helper.assertTrue(original.currentGoal().isEmpty(), "stop did not synchronously clear goal");
         helper.succeed();
     }
@@ -113,6 +113,11 @@ public final class JevGameTests {
         helper.assertTrue(entity.requiresCustomPersistence(), "companion may despawn when owners are absent");
         helper.assertTrue(entity.getBbHeight() >= 1.7f && entity.getBbHeight() <= 1.9f, "companion is not player-sized");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void creativeInventoryRequiresExplicitOperatorEntitlement(GameTestHelper helper){
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));helper.assertTrue(!entity.actions().creativeSetInventory(0,new ItemStack(Items.DIAMOND_BLOCK,64)),"survival companion created creative items");helper.assertTrue(entity.inventory().getItem(0).isEmpty(),"denied creative edit mutated inventory");entity.setCreativeMode(true);helper.assertTrue(entity.actions().creativeSetInventory(0,new ItemStack(Items.DIAMOND_BLOCK,64)),"entitled creative inventory edit failed");helper.assertValueEqual(entity.inventory().getItem(0).getCount(),64,"creative inventory exact count");helper.assertTrue(!entity.actions().creativeSetInventory(1,new ItemStack(Items.DIAMOND_BLOCK,65)),"overstacked creative edit was accepted");helper.assertTrue(entity.actions().creativeSetInventory(0,ItemStack.EMPTY),"creative deletion failed");helper.assertTrue(entity.inventory().getItem(0).isEmpty(),"creative deletion did not clear slot");entity.setCreativeMode(false);helper.assertTrue(!entity.actions().creativeSetInventory(0,new ItemStack(Items.BEDROCK)),"revoked creative mode still created items");helper.succeed();
     }
 
     @GameTest(template = "empty", timeoutTicks = 240)
@@ -637,8 +642,10 @@ public final class JevGameTests {
         helper.assertTrue(entity.administrators().contains(sender.getUUID()), "owner could not add a UUID administrator");
         helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev operator JevMsgTest enable");
         helper.assertTrue(!entity.operatorTeleportAllowed(), "ordinary owner granted operator teleport authority");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(),"jev creative JevMsgTest enable");helper.assertTrue(!entity.creativeMode(),"ordinary owner granted creative authority");
         helper.getLevel().getServer().getCommands().performPrefixedCommand(helper.getLevel().getServer().createCommandSourceStack(), "jev operator JevMsgTest enable");
         helper.assertTrue(entity.operatorTeleportAllowed(), "server operator could not grant teleport authority");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(helper.getLevel().getServer().createCommandSourceStack(),"jev creative JevMsgTest enable");helper.assertTrue(entity.creativeMode(),"server operator could not grant creative authority");
         helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev setspawn JevMsgTest");
         helper.assertValueEqual(entity.respawnPosition(), sender.blockPosition(), "authorized owner could not set companion spawn");
         helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "msg JevMsgTest follow me");

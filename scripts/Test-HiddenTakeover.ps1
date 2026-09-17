@@ -1,5 +1,6 @@
 param([int]$Port = 25575, [switch]$LiveGateway)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ProcessArguments.ps1')
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $artifact = Join-Path $root ('artifacts\hidden-takeover-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 $serverDir = Join-Path $artifact 'server'; $clientDir = Join-Path $artifact 'client'
@@ -13,7 +14,7 @@ function Start-Owned([string]$task,[string[]]$properties,[string]$prefix) {
     $info=[Diagnostics.ProcessStartInfo]::new(); $info.FileName=(Join-Path $root 'gradlew.bat'); $info.WorkingDirectory=$root
     $info.UseShellExecute=$false; $info.CreateNoWindow=$true; $info.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
     $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true; $info.RedirectStandardInput=$true
-    $info.ArgumentList.Add('--no-daemon'); $info.ArgumentList.Add($task); foreach($p in $properties){$info.ArgumentList.Add($p)}
+    Set-ProcessArguments $info (@('--no-daemon',$task)+$properties)
     $process=[Diagnostics.Process]::new(); $process.StartInfo=$info; $null=$process.Start()
     return @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync();prefix=$prefix}
 }

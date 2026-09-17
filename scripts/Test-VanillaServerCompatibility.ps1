@@ -1,5 +1,6 @@
 param([int]$Port = 25576)
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ProcessArguments.ps1')
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $artifact = Join-Path $root ('artifacts\vanilla-compat-' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff'))
 $serverDir = Join-Path $artifact 'vanilla-server'
@@ -30,7 +31,7 @@ function Start-Owned([string]$file,[string[]]$arguments,[string]$workingDirector
     $info=[Diagnostics.ProcessStartInfo]::new(); $info.FileName=$file; $info.WorkingDirectory=$workingDirectory
     $info.UseShellExecute=$false; $info.CreateNoWindow=$true; $info.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
     $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true; $info.RedirectStandardInput=$true
-    foreach($argument in $arguments){$info.ArgumentList.Add($argument)}
+    Set-ProcessArguments $info $arguments
     $process=[Diagnostics.Process]::new(); $process.StartInfo=$info; $null=$process.Start()
     return @{process=$process;stdout=$process.StandardOutput.ReadToEndAsync();stderr=$process.StandardError.ReadToEndAsync()}
 }

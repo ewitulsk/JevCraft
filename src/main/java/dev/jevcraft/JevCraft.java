@@ -132,7 +132,7 @@ public final class JevCraft {
             JevCompanion jev = JEV.get().create(level); if (jev == null) throw new IllegalStateException("persistence fixture entity creation failed");
             jev.setUUID(actor); jev.setCustomName(Component.literal("PersistJev")); jev.setOwner(owner); jev.addAdministrator(admin);
             jev.acceptGoal("follow me"); jev.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 7)); jev.setItemSlot(EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET));
-            jev.setExperience(7, 91, .4f); jev.setOperatorTeleportAllowed(true); jev.observeChat(owner, "remember this", true, true); jev.setHealth(13);
+            jev.setExperience(7, 91, .4f); jev.setOperatorTeleportAllowed(true);jev.setCreativeMode(true); jev.observeChat(owner, "remember this", true, true); jev.setHealth(13);
             BlockPos spawn = level.getSharedSpawnPos(); jev.moveTo(spawn.getX()+.5, spawn.getY()+1, spawn.getZ()+.5, 0, 0);
             jev.setRespawnPoint(level.dimension(), spawn.above(), 45);
             if (!level.addFreshEntity(jev)) throw new IllegalStateException("persistence fixture entity add failed");
@@ -235,7 +235,7 @@ public final class JevCraft {
         if (!owner.equals(jev.owner()) || !jev.administrators().contains(admin) || !"follow me".equals(jev.currentGoal())
                 || jev.inventory().getItem(0).getCount() != 7 || jev.recentChat().size() != 1 || Math.abs(jev.getHealth() - 13) > 0.01
                 || !jev.getItemBySlot(EquipmentSlot.HEAD).is(Items.IRON_HELMET) || jev.experienceLevel() != 7 || jev.totalExperience() != 91
-                || Math.abs(jev.experienceProgress() - .4f) > .001 || !jev.operatorTeleportAllowed() || !server.overworld().dimension().equals(jev.respawnDimension())
+                || Math.abs(jev.experienceProgress() - .4f) > .001 || !jev.operatorTeleportAllowed()||!jev.creativeMode() || !server.overworld().dimension().equals(jev.respawnDimension())
                 || !"PersistJev".equals(data.name(actor)) || data.grant(grantPlayer) != JevWorldData.GrantState.DELIVERED
                 || !ForcedChunkManager.hasForcedChunks(server.overworld()) || data.pendingRespawnCount() != 0
                 || !"RestartJev".equals(data.name(respawnActor)))
@@ -281,6 +281,9 @@ public final class JevCraft {
                 .then(Commands.literal("operator").then(Commands.argument("name", StringArgumentType.word())
                         .then(Commands.literal("enable").executes(context -> changeOperatorCapability(context, true)))
                         .then(Commands.literal("disable").executes(context -> changeOperatorCapability(context, false)))))
+                .then(Commands.literal("creative").then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.literal("enable").executes(context -> changeCreativeCapability(context, true)))
+                        .then(Commands.literal("disable").executes(context -> changeCreativeCapability(context, false)))))
                 .then(Commands.literal("setspawn").then(Commands.argument("name", StringArgumentType.word()).executes(this::setCompanionSpawn))));
         event.getDispatcher().register(Commands.literal("jev").then(Commands.literal("metrics").executes(context -> {
             var metrics = JevInferenceHost.instance().metrics();
@@ -313,6 +316,9 @@ public final class JevCraft {
         companion.setOperatorTeleportAllowed(allowed);
         context.getSource().sendSuccess(() -> Component.literal("Teleport authority " + (allowed ? "enabled" : "disabled") + " for " + companion.getName().getString()), true);
         return 1;
+    }
+    private int changeCreativeCapability(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context,boolean allowed){
+        JevCompanion companion=find(context.getSource().getServer(),StringArgumentType.getString(context,"name"));if(companion==null)return 0;if(!context.getSource().hasPermission(2)){context.getSource().sendFailure(Component.literal("Only a server operator can change Jev creative mode."));return 0;}companion.setCreativeMode(allowed);context.getSource().sendSuccess(()->Component.literal("Creative mode "+(allowed?"enabled":"disabled")+" for "+companion.getName().getString()),true);return 1;
     }
     private int setCompanionSpawn(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> context)
             throws com.mojang.brigadier.exceptions.CommandSyntaxException {

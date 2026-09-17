@@ -150,6 +150,9 @@ public final class CompanionActionExecutor {
     public boolean equipInventoryStack(ServerLevel level,int sourceSlot,EquipmentSlot equipmentSlot){
         return interactions.equipInventoryStack(level,sourceSlot,equipmentSlot);
     }
+    public boolean creativeSetInventory(int slot,ItemStack requested){
+        if(!companion.creativeMode()||slot<0||slot>=companion.inventory().getContainerSize()||requested==null||requested.getCount()<0||(!requested.isEmpty()&&requested.getCount()>requested.getMaxStackSize()))return false;companion.inventory().setItem(slot,requested.copy());return ItemStack.matches(companion.inventory().getItem(slot),requested);
+    }
     public boolean raiseShield(ServerLevel level,int inventorySlot){
         if(!companion.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)&&!interactions.equipInventoryStack(level,inventorySlot,EquipmentSlot.OFFHAND))return false;if(!companion.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD))return false;companion.startUsingItem(InteractionHand.OFF_HAND);return companion.isUsingItem();
     }

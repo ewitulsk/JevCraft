@@ -41,6 +41,7 @@ public final class JevCompanion extends PathfinderMob {
     private int experienceLevel, totalExperience;
     private float experienceProgress;
     private boolean operatorTeleportAllowed;
+    private boolean creativeMode;
     private ResourceKey<Level> respawnDimension;
     private BlockPos respawnPosition;
     private float respawnAngle;
@@ -168,6 +169,8 @@ public final class JevCompanion extends PathfinderMob {
     public void setExperience(int level, int total, float progress) { experienceLevel = Math.max(0, level); totalExperience = Math.max(0, total); experienceProgress = Math.max(0, Math.min(1, progress)); }
     public boolean operatorTeleportAllowed() { return operatorTeleportAllowed; }
     public void setOperatorTeleportAllowed(boolean allowed) { operatorTeleportAllowed = allowed; }
+    public boolean creativeMode(){return creativeMode;}
+    public void setCreativeMode(boolean allowed){creativeMode=allowed;}
     public void setRespawnPoint(ResourceKey<Level> dimension, BlockPos position, float angle) { respawnDimension = dimension; respawnPosition = position.immutable(); respawnAngle = angle; }
     public ResourceKey<Level> respawnDimension() { return respawnDimension; }
     public BlockPos respawnPosition() { return respawnPosition; }
@@ -208,6 +211,7 @@ public final class JevCompanion extends PathfinderMob {
         tag.putString("Goal", currentGoal); tag.putLong("GoalVersion", goalVersion); tag.putInt("Food", food);
         tag.putInt("ExperienceLevel", experienceLevel); tag.putInt("TotalExperience", totalExperience); tag.putFloat("ExperienceProgress", experienceProgress);
         tag.putBoolean("OperatorTeleportAllowed", operatorTeleportAllowed);
+        tag.putBoolean("CreativeMode",creativeMode);
         if (respawnDimension != null && respawnPosition != null) {
             tag.putString("RespawnDimension", respawnDimension.location().toString()); tag.putLong("RespawnPosition", respawnPosition.asLong()); tag.putFloat("RespawnAngle", respawnAngle);
         }
@@ -228,7 +232,7 @@ public final class JevCompanion extends PathfinderMob {
         for (var value : tag.getList("Administrators", 10)) if (value instanceof CompoundTag entry && entry.hasUUID("Id")) administrators.add(entry.getUUID("Id"));
         currentGoal = tag.getString("Goal"); goalVersion = tag.getLong("GoalVersion"); food = tag.contains("Food") ? tag.getInt("Food") : 20;
         experienceLevel = Math.max(0, tag.getInt("ExperienceLevel")); totalExperience = Math.max(0, tag.getInt("TotalExperience")); experienceProgress = Math.max(0, Math.min(1, tag.getFloat("ExperienceProgress")));
-        operatorTeleportAllowed = tag.getBoolean("OperatorTeleportAllowed"); respawnDimension = null; respawnPosition = null; respawnAngle = 0;
+        operatorTeleportAllowed = tag.getBoolean("OperatorTeleportAllowed");creativeMode=tag.getBoolean("CreativeMode"); respawnDimension = null; respawnPosition = null; respawnAngle = 0;
         if (tag.contains("RespawnDimension") && tag.contains("RespawnPosition")) {
             ResourceLocation id = ResourceLocation.tryParse(tag.getString("RespawnDimension"));
             if (id != null) { respawnDimension = ResourceKey.create(Registries.DIMENSION, id); respawnPosition = BlockPos.of(tag.getLong("RespawnPosition")); respawnAngle = tag.getFloat("RespawnAngle"); }
