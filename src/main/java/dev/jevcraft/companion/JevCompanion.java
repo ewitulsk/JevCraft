@@ -17,6 +17,7 @@ import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.CrossbowItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.level.ClipContext;
@@ -137,6 +138,9 @@ public final class JevCompanion extends PathfinderMob {
         for (int slot = 0; slot < inventory.getContainerSize(); slot++) if (!inventory.getItem(slot).isEmpty())
             values.add(slot + ":" + inventory.getItem(slot).getHoverName().getString() + "x" + inventory.getItem(slot).getCount());
         return values;
+    }
+    @Override public ItemStack getProjectile(ItemStack weapon){
+        if(weapon.getItem() instanceof CrossbowItem)for(int i=0;i<inventory.getContainerSize();i++){ItemStack candidate=inventory.getItem(i);if(candidate.is(ItemTags.ARROWS)||candidate.is(net.minecraft.world.item.Items.FIREWORK_ROCKET))return candidate;}return super.getProjectile(weapon);
     }
     public void observeChat(UUID sender, String text, boolean authorized, boolean privateMessage) {
         String bounded = text == null ? "" : text.strip();
