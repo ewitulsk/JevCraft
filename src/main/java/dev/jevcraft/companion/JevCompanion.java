@@ -175,6 +175,8 @@ public final class JevCompanion extends PathfinderMob {
     public void setOperatorTeleportAllowed(boolean allowed) { operatorTeleportAllowed = allowed; }
     public boolean creativeMode(){return creativeMode;}
     public void setCreativeMode(boolean allowed){creativeMode=allowed;}
+    public boolean tryStartCompanionFallFlying(){if(onGround()||isFallFlying()||isInWater()||hasEffect(net.minecraft.world.effect.MobEffects.LEVITATION))return false;ItemStack chest=getItemBySlot(EquipmentSlot.CHEST);if(!chest.canElytraFly(this))return false;setSharedFlag(7,true);setPose(Pose.FALL_FLYING);return true;}
+    public void stopCompanionFallFlying(){if(isFallFlying()){setSharedFlag(7,true);setSharedFlag(7,false);}if(getPose()==Pose.FALL_FLYING)setPose(Pose.STANDING);}
     public void setRespawnPoint(ResourceKey<Level> dimension, BlockPos position, float angle) { respawnDimension = dimension; respawnPosition = position.immutable(); respawnAngle = angle; }
     public ResourceKey<Level> respawnDimension() { return respawnDimension; }
     public BlockPos respawnPosition() { return respawnPosition; }
