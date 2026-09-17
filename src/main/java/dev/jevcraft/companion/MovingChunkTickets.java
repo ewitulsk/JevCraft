@@ -3,6 +3,7 @@ package dev.jevcraft.companion;
 import dev.jevcraft.JevCraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ForcedChunksSavedData;
 import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
 import net.neoforged.neoforge.common.world.chunk.TicketController;
 
@@ -30,5 +31,10 @@ public final class MovingChunkTickets {
     public static void prepare(ServerLevel level, JevCompanion owner, int xCenter, int zCenter, int radius) {
         for (int x = xCenter - radius; x <= xCenter + radius; x++) for (int z = zCenter - radius; z <= zCenter + radius; z++)
             CONTROLLER.forceChunk(level, owner, x, z, true, true);
+    }
+    public static int tickingTicketCount(ServerLevel level) {
+        ForcedChunksSavedData data = level.getDataStorage().get(ForcedChunksSavedData.factory(), "chunks");
+        if (data == null) return 0;
+        return data.getEntityForcedChunks().getTickingChunks().values().stream().mapToInt(set -> set.size()).sum();
     }
 }

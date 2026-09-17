@@ -35,7 +35,8 @@ neoForge {
         }
         persistenceServer {
             server(); gameDirectory = file(findProperty('jevcraftPersistenceDir') ?: 'runs/persistence-server')
-            programArgument '--nogui'; systemProperty 'jevcraft.persistenceTest', (findProperty('jevcraftPersistencePhase') ?: '').toString(); jvmArgument '-Xmx2G'
+            programArgument '--nogui'; systemProperty 'jevcraft.persistenceTest', (findProperty('jevcraftPersistencePhase') ?: '').toString()
+            systemProperty 'jevcraft.benchmarkActors', (findProperty('jevcraftBenchmarkActors') ?: '1').toString(); jvmArgument '-Xmx2G'
         }
     }
     mods { jevcraft { sourceSet sourceSets.main } }

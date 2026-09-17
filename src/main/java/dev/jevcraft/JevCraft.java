@@ -60,6 +60,8 @@ public final class JevCraft {
     private int remoteTickTestTicks = -1;
     private static final UUID REMOTE_TEST_ACTOR = UUID.fromString("089f86c5-1cfa-48bb-a28a-da209b531ff5");
     private BlockPos remoteTestFurnace;
+    private int benchmarkTicks = -1, benchmarkActors;
+    private long benchmarkStartNanos;
 
     public JevCraft(IEventBus modBus) {
         ENTITIES.register(modBus); ITEMS.register(modBus);
@@ -158,6 +160,18 @@ public final class JevCraft {
             furnace.setItem(0, new ItemStack(Items.IRON_ORE)); furnace.setItem(1, new ItemStack(Items.COAL));
             remoteTickTestTicks = 260;
             LOGGER.info("REMOTE_TICK_CREATE_READY");
+        } else if (phase.equals("benchmark")) {
+            benchmarkActors = Integer.getInteger("jevcraft.benchmarkActors", 1);
+            if (benchmarkActors != 0 && benchmarkActors != 1 && benchmarkActors != 5 && benchmarkActors != 10) throw new IllegalArgumentException("benchmark actors must be 0, 1, 5, or 10");
+            UUID benchmarkOwner = UUID.fromString("6443ec2d-8092-41e7-b682-120c25fd650b"); BlockPos spawn = level.getSharedSpawnPos(); JevWorldData data = JevWorldData.get(server);
+            for (int index = 0; index < benchmarkActors; index++) {
+                UUID id = UUID.nameUUIDFromBytes(("jevcraft:benchmark:" + index).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                BlockPos body = new BlockPos(spawn.getX() + (40 + index * 10) * 16, spawn.getY() + 1, spawn.getZ()); level.getChunkAt(body);
+                JevCompanion jev = JEV.get().create(level); if (jev == null) throw new IllegalStateException("benchmark entity creation failed");
+                jev.setUUID(id); jev.setOwner(benchmarkOwner); jev.setCustomName(Component.literal("BenchmarkJev" + index)); jev.moveTo(body.getX() + .5, body.getY(), body.getZ() + .5, 0, 0);
+                if (!data.register(id, "BenchmarkJev" + index) || !level.addFreshEntity(jev)) throw new IllegalStateException("benchmark entity add failed");
+            }
+            benchmarkTicks = 400; benchmarkStartNanos = System.nanoTime(); LOGGER.info("AGENT_SCALE_READY actors={}", benchmarkActors);
         }
     }
     private void serverTick(ServerTickEvent.Post event) {
@@ -173,6 +187,9 @@ public final class JevCraft {
             verifyRemoteTicking(event.getServer());
             persistenceShutdownTicks = 40;
         }
+        if (benchmarkTicks >= 0 && --benchmarkTicks == 0) {
+            benchmarkTicks = -1; verifyAgentScale(event.getServer()); persistenceShutdownTicks = 40;
+        }
         if (persistenceShutdownTicks < 0 || --persistenceShutdownTicks > 0) return;
         persistenceShutdownTicks = -1;
         LOGGER.info("PERSISTENCE_TEST_STOPPING");
@@ -187,6 +204,17 @@ public final class JevCraft {
                 || !furnace.getItem(2).is(Items.IRON_INGOT)) throw new IllegalStateException("remote furnace did not complete while no players were present");
         if (!ForcedChunkManager.hasForcedChunks(server.overworld())) throw new IllegalStateException("remote ticking ticket was not retained");
         LOGGER.info("REMOTE_TICK_PASS entityTicks={} furnaceOutput={}", jev.tickCount, furnace.getItem(2).getCount());
+    }
+    private void verifyAgentScale(net.minecraft.server.MinecraftServer server) {
+        int found = 0, minimumTicks = Integer.MAX_VALUE;
+        for (var entity : server.overworld().getAllEntities()) if (entity instanceof JevCompanion jev && jev.getName().getString().startsWith("BenchmarkJev")) { found++; minimumTicks = Math.min(minimumTicks, jev.tickCount); }
+        if (benchmarkActors == 0) minimumTicks = 0;
+        int tickets = MovingChunkTickets.tickingTicketCount(server.overworld());
+        if (!server.getPlayerList().getPlayers().isEmpty() || found != benchmarkActors || (benchmarkActors > 0 && minimumTicks < 350) || tickets != benchmarkActors * 25)
+            throw new IllegalStateException("agent scale invariant failed: found=" + found + " minTicks=" + minimumTicks + " tickets=" + tickets);
+        long elapsedMs = (System.nanoTime() - benchmarkStartNanos) / 1_000_000; double wallMspt = elapsedMs / 400d;
+        double serverMspt = server.getAverageTickTimeNanos() / 1_000_000d;
+        LOGGER.info("AGENT_SCALE_PASS actors={} ticks=400 minimumEntityTicks={} tickets={} elapsedMs={} wallMspt={} serverMspt={}", benchmarkActors, minimumTicks, tickets, elapsedMs, String.format(Locale.ROOT, "%.3f", wallMspt), String.format(Locale.ROOT, "%.3f", serverMspt));
     }
     private void verifyPersistenceReload(net.minecraft.server.MinecraftServer server) {
         UUID actor = UUID.fromString("79eaf327-3320-4b72-9b45-e2666f089c42");

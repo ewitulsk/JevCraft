@@ -8,6 +8,7 @@
 - `scripts/Test-HiddenTakeover.ps1`: launches only project-owned processes and an unfocused hidden GLFW client against a loopback dedicated server. Its default deterministic typed decision fixture isolates client mechanics; `-LiveGateway` requires a live Vercel/Jev decision. Paired evidence requires normal multiplayer block removal, item pickup, goal completion, and released synthetic keys.
 - `scripts/Test-Persistence.ps1`: creates state and a pending respawn in a dedicated-server world, stops through the normal save path, boots the same world again, and mechanically verifies entity state, world SavedData, ticking tickets, and completion of the queued same-UUID respawn before another orderly stop.
 - `scripts/Test-RemoteTicking.ps1`: boots a dedicated server with no players, places a Jev and furnace 40 chunks from spawn, and requires both the entity and furnace to keep ticking through a registered 5×5 ticking region.
+- `scripts/Test-AgentScaling.ps1`: runs fresh no-player dedicated-server worlds at 0/1/5/10 distant Jevs, asserts exact bounded ticket counts and per-entity ticks, and records both 20 TPS wall pacing and Minecraft's internal processing time. See `BENCHMARKS.md`.
 
 ## Opt-in live route
 
@@ -21,4 +22,4 @@ The direct TypeSafe route has deterministic fake-endpoint coverage but no live r
 
 ## Not yet established
 
-Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, broader offline-owner task completion, the live direct-TypeSafe route, and one/five/ten-agent TPS/cost benchmarks remain open. See `CAPABILITY_MATRIX.md`.
+Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, broader offline-owner task completion, the live direct-TypeSafe route, and repeated one/five/ten-agent live-task success/cost benchmarks remain open. Mechanical 0/1/5/10 ticking-region scaling is established separately. See `CAPABILITY_MATRIX.md`.

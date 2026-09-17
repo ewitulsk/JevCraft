@@ -19,7 +19,7 @@ Requires Java 21. On Windows:
 
 Both editions include the same takeover controller: press F8 for the non-pausing instruction overlay and F9 for immediate stop. The initial verified takeover goal is “collect one/four oak logs”; it uses Jev to select a visible target and ordinary client movement, mining, and pickup paths.
 
-See `docs/CAPABILITY_MATRIX.md` and `docs/VERIFICATION.md` for the difference between implemented mechanics, deterministic verification, and live Jev gameplay evidence.
+See `docs/CAPABILITY_MATRIX.md`, `docs/VERIFICATION.md`, and `docs/BENCHMARKS.md` for the difference between implemented mechanics, deterministic verification, live Jev gameplay evidence, and performance measurements.
 
 Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, `/jev admin <name> add|remove <player>`, `/jev setspawn <name>`, `/jev operator <name> enable|disable`, `/jev metrics`, and the diagnostic fallback `/jev msg <name> <message>`. Native `/msg`, `/tell`, and `/w` route to an exact loaded Jev name while preserving ordinary player targets. Owners and persisted administrators may assign or stop goals; only owners or server operators manage administrators, and only a server operator can grant the separate teleport capability. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
 
