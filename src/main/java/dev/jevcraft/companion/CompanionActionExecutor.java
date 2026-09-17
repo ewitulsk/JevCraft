@@ -58,6 +58,9 @@ public final class CompanionActionExecutor {
         if (!target.isAlive() || target.level() != level || companion.distanceToSqr(target) > 16) return InteractionResult.FAIL;
         return interactions.interactEntity(level, target, inventorySlot);
     }
+    public boolean trade(ServerLevel level,Entity merchant,int offerIndex){
+        return merchant.isAlive()&&merchant.level()==level&&companion.distanceToSqr(merchant)<=16&&interactions.trade(level,merchant,offerIndex);
+    }
     public boolean depositStack(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         if (companion.distanceToSqr(hit.getLocation()) > 25) return false;
         return interactions.quickMoveToContainer(level, hit, inventorySlot);

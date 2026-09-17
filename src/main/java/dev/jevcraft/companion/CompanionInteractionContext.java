@@ -16,6 +16,7 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.SmokerMenu;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
@@ -23,6 +24,8 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.SmokerBlockEntity;
+import net.minecraft.world.item.trading.Merchant;
+import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.Mth;
@@ -112,6 +115,16 @@ public final class CompanionInteractionContext {
         if(!actor.isSleeping())return false;
         BlockPos sleeping=actor.getSleepingPos().orElse(null);actor.stopSleeping();if(sleeping==null)return false;
         companion.startSleeping(sleeping);return companion.isSleeping();
+    }
+
+    /** Selects and completes one merchant offer through payment and result slots after normal entity access succeeds. */
+    public boolean trade(ServerLevel level,Entity target,int offerIndex){
+        if(!(target instanceof Merchant merchant)||offerIndex<0)return false;FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
+        ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.interactOn(target,InteractionHand.MAIN_HAND);actor.getInventory().setItem(actor.getInventory().selected,held);
+        if(!access.consumesAction()||merchant.getTradingPlayer()!=actor||offerIndex>=merchant.getOffers().size()){merchant.setTradingPlayer(null);clearPlayer(actor);return false;}
+        MerchantOffer offer=merchant.getOffers().get(offerIndex);if(offer.isOutOfStock()){merchant.setTradingPlayer(null);clearPlayer(actor);return false;}ItemStack result=offer.getResult();int before=countItem(actor.getInventory(),result),uses=offer.getUses();
+        MerchantMenu menu=new MerchantMenu(0,actor.getInventory(),merchant);menu.setSelectionHint(offerIndex);menu.tryMoveItems(offerIndex);if(!menu.getSlot(2).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}
+        menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);boolean completed=offer.getUses()==uses+1&&countItem(companion.inventory(),result)>=before+result.getCount();clearPlayer(actor);return completed;
     }
 
     /** Transfers one complete stack through a real ChestMenu after normal block-use access succeeds. */

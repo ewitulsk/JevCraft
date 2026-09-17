@@ -21,6 +21,10 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.item.trading.ItemCost;
+import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.portal.DimensionTransition;
@@ -308,6 +312,14 @@ public final class JevGameTests {
         helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),cow,8).consumesAction(),"lead interaction callback failed");
         helper.assertTrue(cow.getLeashHolder()==entity,"lead remained attached to the temporary player context");
         helper.assertTrue(entity.inventory().getItem(8).isEmpty(),"lead interaction did not consume the lead");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionTradesThroughMerchantMenu(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Villager villager=helper.spawn(EntityType.VILLAGER,new BlockPos(3,1,2));villager.setNoAi(true);
+        MerchantOffer offer=new MerchantOffer(new ItemCost(Items.EMERALD,3),new ItemStack(Items.BREAD,2),8,1,0);MerchantOffers offers=villager.getOffers();offers.clear();offers.add(offer);entity.inventory().setItem(13,new ItemStack(Items.EMERALD,5));
+        helper.assertTrue(entity.actions().trade(helper.getLevel(),villager,0),"merchant menu did not complete selected offer");
+        int emeralds=0,bread=0;for(int i=0;i<entity.inventory().getContainerSize();i++){if(entity.inventory().getItem(i).is(Items.EMERALD))emeralds+=entity.inventory().getItem(i).getCount();if(entity.inventory().getItem(i).is(Items.BREAD))bread+=entity.inventory().getItem(i).getCount();}helper.assertValueEqual(emeralds,2,"merchant payment did not consume exactly three emeralds");helper.assertValueEqual(bread,2,"merchant result did not return two bread");helper.assertValueEqual(offer.getUses(),1,"merchant result callback did not record offer use");helper.assertTrue(villager.getTradingPlayer()==null,"merchant session was not closed");helper.succeed();
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
