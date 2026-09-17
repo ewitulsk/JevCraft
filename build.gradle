@@ -105,3 +105,8 @@ tasks.register('liveGatewaySmoke', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'dev.jevcraft.inference.LiveGatewaySmoke'
 }
+tasks.register('liveGatewayScale', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.jevcraft.inference.LiveGatewayScaleBenchmark'
+}

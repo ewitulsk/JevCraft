@@ -12,7 +12,7 @@
 
 ## Opt-in live route
 
-Set `AI_GATEWAY_API_KEY` only in the process environment and run `gradlew liveGatewaySmoke`. It sends one compact mixed-question request to `typesafe-ai/jev`. The key is not logged or stored.
+Set `AI_GATEWAY_API_KEY` only in the process environment and run `gradlew liveGatewaySmoke`. It sends one compact mixed-question request to `typesafe-ai/jev`. `gradlew liveGatewayScale` runs three paid repeats at 1/5/10 actors with concurrency two and reports tokens, latency, wall time, and input-cost estimates. The key is not logged or stored.
 
 Verified on September 17, 2026 after account credit was added: Vercel gateway returned all three answer types from `typesafe-ai/jev` (429 input tokens, 852 ms). A live in-world GameTest passed again through the shared fair scheduler (`JEV_LIVE_DECISION`, 827 ms), selected a visible log, and completed normal progressive mining. These establish the gateway route and one narrow gameplay decision, not general gameplay competence.
 
@@ -22,4 +22,4 @@ The direct TypeSafe route has deterministic fake-endpoint coverage but no live r
 
 ## Not yet established
 
-Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, broader offline-owner task completion, the live direct-TypeSafe route, and repeated one/five/ten-agent live-task success/cost benchmarks remain open. Mechanical 0/1/5/10 ticking-region scaling is established separately. See `CAPABILITY_MATRIX.md`.
+Unmodified-server connection acceptance, general recipe/menu operation, full vanilla action coverage, third-party chat-mod coexistence, portal ticket transfer, broader offline-owner task completion, the live direct-TypeSafe route, and repeated one/five/ten-agent live Minecraft task-success benchmarks remain open. Mechanical 0/1/5/10 ticking-region scaling and repeated 1/5/10 paid typed-transport scaling are established separately. See `CAPABILITY_MATRIX.md`.
