@@ -43,6 +43,8 @@ public final class CompanionActionExecutor {
     private int swimTicks;
     private LivingEntity crossbowTarget;
     private int crossbowSlot=-1,crossbowTicks;
+    private LivingEntity tridentTarget;
+    private int tridentSlot=-1,tridentTicks;
     private String lastFailure="";
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
@@ -51,18 +53,19 @@ public final class CompanionActionExecutor {
         this.companion = companion; this.interactions = new CompanionInteractionContext(companion);
     }
     public void beginMine(BlockPos target, long goalVersion) {
-        restoreCrossbow();miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
+        restoreChargedWeapons();miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginRangedAttack(LivingEntity target,int bowSlot,int ammoSlot,long goalVersion){
-        restoreCrossbow();rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
+        restoreChargedWeapons();rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginMove(Vec3 target,double speed,long goalVersion){
-        restoreCrossbow();movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();
+        restoreChargedWeapons();movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();
     }
-    public void beginClimb(Vec3 target,long goalVersion){restoreCrossbow();climbTarget=Objects.requireNonNull(target);climbTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();}
-    public void beginSwim(Vec3 target,long goalVersion){restoreCrossbow();swimTarget=Objects.requireNonNull(target);swimTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;companion.getNavigation().stop();}
-    public void beginCrossbowAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreCrossbow();crossbowTarget=Objects.requireNonNull(target);crossbowSlot=weaponSlot;crossbowTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
-    public void cancel() { restoreCrossbow();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
+    public void beginClimb(Vec3 target,long goalVersion){restoreChargedWeapons();climbTarget=Objects.requireNonNull(target);climbTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();}
+    public void beginSwim(Vec3 target,long goalVersion){restoreChargedWeapons();swimTarget=Objects.requireNonNull(target);swimTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;companion.getNavigation().stop();}
+    public void beginCrossbowAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();crossbowTarget=Objects.requireNonNull(target);crossbowSlot=weaponSlot;crossbowTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
+    public void beginTridentAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();tridentTarget=Objects.requireNonNull(target);tridentSlot=weaponSlot;tridentTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
+    public void cancel() { restoreChargedWeapons();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public String lastFailure(){return lastFailure;}
@@ -179,6 +182,7 @@ public final class CompanionActionExecutor {
     public boolean wakeUp(){if(!companion.isSleeping())return false;companion.stopSleeping();return !companion.isSleeping();}
 
     public Result tick(ServerLevel level) {
+        if(tridentTarget!=null)return tickTrident(level);
         if(crossbowTarget!=null)return tickCrossbow(level);
         if(rangedTarget!=null) return tickRanged(level);
         if(swimTarget!=null)return tickSwim(level);
@@ -254,4 +258,11 @@ public final class CompanionActionExecutor {
     private void restoreCrossbow(){
         if(crossbowSlot>=0){if(companion.isUsingItem()&&companion.getUsedItemHand()==InteractionHand.MAIN_HAND)companion.stopUsingItem();ItemStack held=companion.getMainHandItem();if(!held.isEmpty()){if(companion.inventory().getItem(crossbowSlot).isEmpty())companion.inventory().setItem(crossbowSlot,held.copy());else companion.inventory().addItem(held.copy());companion.setItemSlot(EquipmentSlot.MAINHAND,ItemStack.EMPTY);}}crossbowTarget=null;crossbowSlot=-1;crossbowTicks=0;
     }
+    private Result tickTrident(ServerLevel level){
+        if(actionGoalVersion!=companion.goalVersion()||!tridentTarget.isAlive()||tridentTarget.level()!=level||tridentSlot<0||tridentSlot>=companion.inventory().getContainerSize()){lastFailure="invalid_trident_action";cancel();return lastResult=Result.INVALID;}if(tridentTicks==0){ItemStack weapon=companion.inventory().getItem(tridentSlot);if(!weapon.is(net.minecraft.world.item.Items.TRIDENT)){lastFailure="missing_trident";cancel();return lastResult=Result.INVALID;}companion.inventory().setItem(tridentSlot,ItemStack.EMPTY);companion.setItemSlot(EquipmentSlot.MAINHAND,weapon);companion.startUsingItem(InteractionHand.MAIN_HAND);}Vec3 aim=tridentTarget.getEyePosition();companion.getLookControl().setLookAt(aim);if(++tridentTicks<14)return lastResult=Result.WORKING;companion.stopUsingItem();ItemStack held=companion.getMainHandItem().copy();companion.setItemSlot(EquipmentSlot.MAINHAND,ItemStack.EMPTY);companion.inventory().setItem(tridentSlot,held);int slot=tridentSlot;tridentTarget=null;tridentSlot=-1;tridentTicks=0;if(!interactions.throwTrident(level,aim,slot,14)){lastFailure="release_failed";return lastResult=Result.INVALID;}return lastResult=Result.SUCCEEDED;
+    }
+    private void restoreTrident(){
+        if(tridentSlot>=0){if(companion.isUsingItem()&&companion.getUsedItemHand()==InteractionHand.MAIN_HAND)companion.stopUsingItem();ItemStack held=companion.getMainHandItem();if(!held.isEmpty()){if(companion.inventory().getItem(tridentSlot).isEmpty())companion.inventory().setItem(tridentSlot,held.copy());else companion.inventory().addItem(held.copy());companion.setItemSlot(EquipmentSlot.MAINHAND,ItemStack.EMPTY);}}tridentTarget=null;tridentSlot=-1;tridentTicks=0;
+    }
+    private void restoreChargedWeapons(){restoreCrossbow();restoreTrident();}
 }

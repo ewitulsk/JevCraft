@@ -50,6 +50,7 @@ import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
+import net.minecraft.world.item.TridentItem;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.AABB;
@@ -110,6 +111,10 @@ public final class CompanionInteractionContext {
         InteractionResult result=actor.gameMode.useItem(actor,level,actor.getInventory().getItem(0),InteractionHand.MAIN_HAND);
         for(Projectile projectile:level.getEntitiesOfClass(Projectile.class,new AABB(actor.blockPosition()).inflate(3),candidate->candidate.getOwner()==actor))projectile.setOwner(companion);
         companion.inventory().setItem(slot,actor.getInventory().getItem(0).copy()); actor.getInventory().setItem(0,ItemStack.EMPTY); return result;
+    }
+
+    public boolean throwTrident(ServerLevel level,Vec3 aim,int slot,int chargeTicks){
+        if(slot<0||slot>=companion.inventory().getContainerSize())return false;ItemStack authoritative=companion.inventory().getItem(slot);if(!(authoritative.getItem() instanceof TridentItem trident))return false;FakePlayer actor=player(level);Vec3 delta=aim.subtract(actor.getEyePosition());double horizontal=Math.sqrt(delta.x*delta.x+delta.z*delta.z);actor.setYRot((float)(Mth.atan2(delta.z,delta.x)*180/Math.PI)-90);actor.setYHeadRot(actor.getYRot());actor.setXRot((float)-(Mth.atan2(delta.y,horizontal)*180/Math.PI));actor.getInventory().selected=0;actor.getInventory().setItem(0,authoritative.copy());int duration=trident.getUseDuration(actor.getMainHandItem(),actor);trident.releaseUsing(actor.getMainHandItem(),level,actor,Math.max(0,duration-chargeTicks));boolean launched=false;for(Projectile projectile:level.getEntitiesOfClass(Projectile.class,new AABB(actor.blockPosition()).inflate(3),candidate->candidate.getOwner()==actor)){projectile.setOwner(companion);launched=true;}companion.inventory().setItem(slot,actor.getInventory().getItem(0).copy());actor.getInventory().setItem(0,ItemStack.EMPTY);return launched;
     }
 
     public void attack(ServerLevel level, Entity target, int slot) {
