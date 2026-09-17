@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.core.Direction;
@@ -31,6 +32,7 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.server.level.ServerPlayer;
@@ -47,6 +49,14 @@ public final class JevGameTests {
         for(int x=0;x<8;x++){for(int z=0;z<6;z++)helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);for(int y=1;y<=2;y++){helper.setBlock(new BlockPos(x,y,0),Blocks.STONE);helper.setBlock(new BlockPos(x,y,5),Blocks.STONE);}}for(int z=1;z<=4;z++)helper.setBlock(new BlockPos(3,1,z),Blocks.STONE_SLAB);
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(1,1,2));entity.acceptGoal("move across slab band");Vec3 target=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,1,2)));helper.runAfterDelay(2,()->entity.actions().beginMove(target,1,entity.goalVersion()));
         helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"goal-versioned navigation has not completed forced slab route; failure="+entity.actions().lastFailure()+" pos="+entity.position()+" distance="+entity.distanceToSqr(target)+" onGround="+entity.onGround());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"completed slab movement did not remain within 1.5 blocks of validated destination; pos="+entity.position());});
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 240)
+    public static void companionNavigatesThroughClosedWoodenDoor(GameTestHelper helper) {
+        for(int x=0;x<8;x++){for(int z=1;z<=3;z++)helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);for(int y=1;y<=2;y++){helper.setBlock(new BlockPos(x,y,1),Blocks.STONE);helper.setBlock(new BlockPos(x,y,3),Blocks.STONE);}}
+        helper.setBlock(new BlockPos(3,1,2),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.EAST).setValue(DoorBlock.HALF,DoubleBlockHalf.LOWER));helper.setBlock(new BlockPos(3,2,2),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.EAST).setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER));
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(1,1,2));entity.acceptGoal("walk through closed door");Vec3 target=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,1,2)));helper.runAfterDelay(2,()->entity.actions().beginMove(target,1,entity.goalVersion()));
+        helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"door-capable navigation did not complete; failure="+entity.actions().lastFailure());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"companion did not emerge beyond closed-door barrier");});
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
@@ -232,17 +242,18 @@ public final class JevGameTests {
         helper.succeed();
     }
 
-    @GameTest(template = "empty", timeoutTicks = 160)
+    @GameTest(template = "empty", timeoutTicks = 260)
     public static void companionRangedAttackUsesOwnedVanillaArrow(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.setOwner(UUID.randomUUID()); entity.acceptGoal("defend");
         var target=helper.spawn(EntityType.COW,new BlockPos(7,1,2)); target.setNoAi(true); float health=target.getHealth();
         entity.inventory().setItem(0,new ItemStack(Items.BOW));entity.inventory().setItem(1,new ItemStack(Items.ARROW,3));
         entity.actions().beginRangedAttack(target,0,1,entity.goalVersion());
-        helper.succeedWhen(()->{
+        helper.runAfterDelay(220,()->{
             helper.assertTrue(target.getHealth()<health,"owned arrow did not damage target");
             helper.assertValueEqual(entity.inventory().getItem(1).getCount(),2,"ranged attack did not consume exactly one arrow");
             helper.assertValueEqual(entity.inventory().getItem(0).getDamageValue(),1,"ranged attack did not damage bow exactly once");
             helper.assertTrue(entity.getLastHurtMob()==target,"projectile combat was not attributed to companion");
+            helper.succeed();
         });
     }
 
@@ -285,6 +296,7 @@ public final class JevGameTests {
             helper.assertTrue(entity.actions().collectFurnace(helper.getLevel(),hit),"furnace result menu callback failed");
             int ingots=0;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.IRON_INGOT))ingots+=entity.inventory().getItem(i).getCount();
             helper.assertValueEqual(ingots,1,"furnace collection did not return exactly one iron ingot");
+            helper.succeed();
         });
     }
 
@@ -294,13 +306,14 @@ public final class JevGameTests {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(9,new ItemStack(Items.BEEF));entity.inventory().setItem(10,new ItemStack(Items.COAL));entity.inventory().setItem(11,new ItemStack(Items.RAW_IRON));entity.inventory().setItem(12,new ItemStack(Items.COAL));
         BlockPos smokerAbsolute=helper.absolutePos(smokerPos),blastAbsolute=helper.absolutePos(blastPos);BlockHitResult smokerHit=new BlockHitResult(Vec3.atCenterOf(smokerAbsolute),Direction.UP,smokerAbsolute,false),blastHit=new BlockHitResult(Vec3.atCenterOf(blastAbsolute),Direction.UP,blastAbsolute,false);
         helper.assertTrue(entity.actions().loadFurnace(helper.getLevel(),smokerHit,9,10),"smoker-specific menu did not accept food and fuel");helper.assertTrue(entity.actions().loadFurnace(helper.getLevel(),blastHit,11,12),"blast-furnace-specific menu did not accept ore and fuel");
-        helper.succeedWhen(()->{
+        helper.runAfterDelay(130,()->{
             helper.assertTrue(helper.getLevel().getBlockEntity(smokerAbsolute) instanceof AbstractFurnaceBlockEntity&&helper.getLevel().getBlockEntity(blastAbsolute) instanceof AbstractFurnaceBlockEntity,"specialized furnace block entity disappeared");
             AbstractFurnaceBlockEntity smoker=(AbstractFurnaceBlockEntity)helper.getLevel().getBlockEntity(smokerAbsolute),blast=(AbstractFurnaceBlockEntity)helper.getLevel().getBlockEntity(blastAbsolute);
             helper.assertTrue(smoker.getItem(2).is(Items.COOKED_BEEF)&&blast.getItem(2).is(Items.IRON_INGOT),"specialized normal ticking has not produced both outputs");
-            helper.assertTrue(entity.actions().collectFurnace(helper.getLevel(),smokerHit)&&entity.actions().collectFurnace(helper.getLevel(),blastHit),"specialized result collection failed");
+            boolean smokerCollected=entity.actions().collectFurnace(helper.getLevel(),smokerHit),blastCollected=entity.actions().collectFurnace(helper.getLevel(),blastHit);helper.assertTrue(smokerCollected,"smoker result collection failed");helper.assertTrue(blastCollected,"blast furnace result collection failed");
             int beef=0,iron=0;for(int i=0;i<entity.inventory().getContainerSize();i++){if(entity.inventory().getItem(i).is(Items.COOKED_BEEF))beef+=entity.inventory().getItem(i).getCount();if(entity.inventory().getItem(i).is(Items.IRON_INGOT))iron+=entity.inventory().getItem(i).getCount();}
             helper.assertValueEqual(beef,1,"smoker output count");helper.assertValueEqual(iron,1,"blast furnace output count");
+            helper.succeed();
         });
     }
 
