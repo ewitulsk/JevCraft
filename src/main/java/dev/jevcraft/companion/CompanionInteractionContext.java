@@ -145,6 +145,25 @@ public final class CompanionInteractionContext {
         return consumedOne && received;
     }
 
+    /** Fills an explicit 3x3 pattern through normal menu clicks; each non-negative entry names a companion inventory slot. */
+    public boolean craftPattern(ServerLevel level,BlockHitResult hit,int[] ingredientSlots){
+        if(ingredientSlots==null||ingredientSlots.length!=9)return false;
+        for(int slot:ingredientSlots)if(slot>=companion.inventory().getContainerSize()||(slot>=0&&companion.inventory().getItem(slot).isEmpty()))return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
+        ItemStack handBefore=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,handBefore);
+        if(!access.consumesAction()){clearPlayer(actor);return false;}
+        CraftingMenu menu=new CraftingMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));
+        for(int grid=0;grid<9;grid++){
+            int source=ingredientSlots[grid];if(source<0)continue;int menuSlot=playerMenuSlot(menu,actor,source);
+            if(menuSlot<0||!menu.getSlot(menuSlot).hasItem()){menu.removed(actor);clearPlayer(actor);return false;}
+            menu.clicked(menuSlot,0,ClickType.PICKUP,actor);menu.clicked(grid+1,1,ClickType.PICKUP,actor);menu.clicked(menuSlot,0,ClickType.PICKUP,actor);
+        }
+        if(!menu.getSlot(0).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}
+        ItemStack result=menu.getSlot(0).getItem().copy();int before=countItem(actor.getInventory(),result);
+        menu.clicked(0,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);boolean received=countItem(companion.inventory(),result)>=before+result.getCount();clearPlayer(actor);return received;
+    }
+
     private static int playerMenuSlot(net.minecraft.world.inventory.AbstractContainerMenu menu, FakePlayer actor, int inventorySlot) {
         for (int i = 0; i < menu.slots.size(); i++) {
             Slot slot = menu.slots.get(i);

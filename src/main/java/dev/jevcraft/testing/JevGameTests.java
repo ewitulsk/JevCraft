@@ -244,6 +244,18 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionCraftsShapedToolThroughRealMenu(GameTestHelper helper) {
+        BlockPos table=new BlockPos(3,1,2);helper.setBlock(table,Blocks.CRAFTING_TABLE);
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.OAK_PLANKS,3));entity.inventory().setItem(1,new ItemStack(Items.STICK,2));
+        BlockPos absolute=helper.absolutePos(table);int[] pickaxe={0,0,0,-1,1,-1,-1,1,-1};
+        helper.assertTrue(entity.actions().craftPattern(helper.getLevel(),new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false),pickaxe),"3x3 crafting menu did not craft shaped tool");
+        helper.assertTrue(entity.inventory().getItem(0).isEmpty()&&entity.inventory().getItem(1).isEmpty(),"shaped recipe did not consume exact ingredients");
+        int pickaxes=0;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.WOODEN_PICKAXE))pickaxes+=entity.inventory().getItem(i).getCount();
+        helper.assertValueEqual(pickaxes,1,"shaped recipe did not return exactly one wooden pickaxe");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionDepositsThroughRealChestMenu(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(3, 1, 2);
         helper.setBlock(chestPos, Blocks.CHEST);

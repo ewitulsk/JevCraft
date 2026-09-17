@@ -62,6 +62,10 @@ public final class CompanionActionExecutor {
         if (companion.distanceToSqr(hit.getLocation()) > 25) return false;
         return interactions.craftSingleIngredient(level, hit, inventorySlot);
     }
+    public boolean craftPattern(ServerLevel level,BlockHitResult hit,int[] ingredientSlots){
+        if(companion.distanceToSqr(hit.getLocation())>25)return false;
+        return interactions.craftPattern(level,hit,ingredientSlots);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);
