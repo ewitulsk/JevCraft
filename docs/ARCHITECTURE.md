@@ -11,4 +11,4 @@ The runtime keeps inference separate from game authority:
 
 `JsonInferenceProvider` implements the Vercel v4 evaluation protocol and TypeSafe direct `systemone` dialect. `DecisionCoordinator` owns cancellation and freshness. `FairScheduler` keeps only the newest queued observation per actor. Domain classes keep permissions, mailbox cursors, memories, inventory revisions, grants, and moving chunk calculations independently testable.
 
-The full artifact contains the server-authoritative companion type. The client-only artifact contains only shared runtime classes and the takeover entry point, avoiding custom registries on an unmodified remote server.
+The full artifact contains the server-authoritative companion type. The client-only source set recompiles only the shared core, inference, and takeover classes plus its own entry point, so its jar never depends on the full mod output. It contains no companion registry, server entry point, or test mixins. A test-only helper supplies hidden-window mixins outside both artifacts, allowing the exact packaged client-only jar to be tested against Mojang's official unmodified server.

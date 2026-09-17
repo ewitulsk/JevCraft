@@ -15,7 +15,7 @@ Requires Java 21. On Windows:
 .\gradlew.bat build
 ```
 
-`build/libs/jevcraft-full-*.jar` is the full client/server mod. `jevcraft-client-*.jar` is the client-only takeover edition.
+`build/libs/jevcraft-full-*.jar` is the full client/server mod. `jevcraft-client-*.jar` is the client-only takeover edition; its isolated runtime has been verified joining Mojang's official unmodified 1.21.1 server.
 
 Both editions include the same takeover controller: press F8 for the non-pausing instruction overlay and F9 for immediate stop. The verified takeover goals include collecting oak logs and placing a requested hotbar block; they use Jev to select visible targets or support faces and ordinary client movement, mining, pickup, and item-use paths.
 

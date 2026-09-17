@@ -54,6 +54,7 @@ public final class TakeoverRuntime {
     private static boolean hiddenPlacementStarted;
     private static int hiddenPlacementCompleteTick = -1;
     private static boolean hiddenConnectStarted;
+    private static int vanillaCompatPassTick = -1;
     private static int hiddenBootTicks;
     private static int nextRequestTick;
 
@@ -77,6 +78,7 @@ public final class TakeoverRuntime {
     private static void tick(ClientTickEvent.Post event) {
         Minecraft minecraft = Minecraft.getInstance();
         hiddenAutoConnect(minecraft);
+        vanillaCompatLifecycle(minecraft);
         while (STOP.consumeClick()) stop(minecraft, "Emergency stop");
         while (OPEN.consumeClick()) minecraft.setScreen(new TakeoverScreen(goal, TakeoverRuntime::start, () -> stop(minecraft, "Stopped")));
         hiddenTestLifecycle(minecraft);
@@ -115,12 +117,22 @@ public final class TakeoverRuntime {
         hiddenTestLifecycle(minecraft);
     }
     private static void hiddenAutoConnect(Minecraft minecraft) {
-        if (!Boolean.getBoolean("jevcraft.hiddenClientTest") || hiddenConnectStarted || minecraft.player != null) return;
+        if ((!Boolean.getBoolean("jevcraft.hiddenClientTest") && !Boolean.getBoolean("jevcraft.vanillaCompatTest")) || hiddenConnectStarted || minecraft.player != null) return;
         if (++hiddenBootTicks < 20 || minecraft.screen == null) return;
         hiddenConnectStarted=true;
         String address="127.0.0.1:"+System.getProperty("jevcraft.testPort","25575");
         ServerData data=new ServerData("JevCraft hidden test",address,ServerData.Type.OTHER);
         ConnectScreen.startConnecting(minecraft.screen,minecraft,ServerAddress.parseString(address),data,false,null);
+    }
+    private static void vanillaCompatLifecycle(Minecraft minecraft) {
+        if (!Boolean.getBoolean("jevcraft.vanillaCompatTest") || minecraft.player == null || minecraft.level == null) return;
+        if (vanillaCompatPassTick < 0) {
+            vanillaCompatPassTick=minecraft.player.tickCount+20;
+            LOGGER.info("VANILLA_COMPAT_CLIENT_JOINED");
+        } else if (minecraft.player.tickCount >= vanillaCompatPassTick) {
+            LOGGER.info("VANILLA_COMPAT_CLIENT_PASS");
+            minecraft.stop();
+        }
     }
     private static void hiddenTestLifecycle(Minecraft minecraft) {
         if (!Boolean.getBoolean("jevcraft.hiddenClientTest") || minecraft.player == null || minecraft.level == null) return;

@@ -10,42 +10,66 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 repositories { mavenCentral() }
 
+sourceSets {
+    clientOnly {
+        java {
+            srcDir 'src/main/java'
+            include 'dev/jevcraft/client/JevCraftClient.java'
+            include 'dev/jevcraft/client/TakeoverRuntime.java'
+            include 'dev/jevcraft/client/TakeoverScreen.java'
+            include 'dev/jevcraft/core/**'
+            include 'dev/jevcraft/inference/**'
+        }
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+    compatTest {
+        compileClasspath += configurations.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
 neoForge {
     version = neoforge_version
+    mods {
+        jevcraft { sourceSet sourceSets.main }
+        jevcraft_client { sourceSet sourceSets.clientOnly }
+        jevcraft_test_helper { sourceSet sourceSets.compatTest }
+    }
     runs {
-        client { client(); gameDirectory = file('runs/client'); jvmArgument '-Xmx3G' }
-        server { server(); gameDirectory = file('runs/server'); programArgument '--nogui'; jvmArgument '-Xmx2G' }
+        client { client(); loadedMods.set([mods.jevcraft]); gameDirectory = file('runs/client'); jvmArgument '-Xmx3G' }
+        server { server(); loadedMods.set([mods.jevcraft]); gameDirectory = file('runs/server'); programArgument '--nogui'; jvmArgument '-Xmx2G' }
         gameTestServer {
             type = 'gameTestServer'
+            loadedMods.set([mods.jevcraft])
             gameDirectory = file('runs/gametest')
             systemProperty 'neoforge.enabledGameTestNamespaces', 'jevcraft'
             programArgument '--nogui'
             jvmArgument '-Xmx2G'
         }
         hiddenServer {
-            server(); gameDirectory = file(findProperty('jevcraftServerDir') ?: 'runs/hidden-server')
+            server(); loadedMods.set([mods.jevcraft]); gameDirectory = file(findProperty('jevcraftServerDir') ?: 'runs/hidden-server')
             programArgument '--nogui'; systemProperty 'jevcraft.hiddenClientTest', 'true'; jvmArgument '-Xmx2G'
         }
         hiddenClient {
-            client(); gameDirectory = file(findProperty('jevcraftClientDir') ?: 'runs/hidden-client')
+            client(); loadedMods.set([mods.jevcraft, mods.jevcraft_test_helper]); gameDirectory = file(findProperty('jevcraftClientDir') ?: 'runs/hidden-client')
             systemProperty 'jevcraft.hiddenClient', 'true'; systemProperty 'jevcraft.hiddenClientTest', 'true'
             systemProperty 'jevcraft.hiddenLiveGateway', (findProperty('jevcraftHiddenLive') ?: 'false').toString()
             systemProperty 'jevcraft.testPort', (findProperty('jevcraftTestPort') ?: '25575').toString()
             jvmArgument '-Xmx2G'
         }
+        hiddenCompatClient {
+            client(); sourceSet = sourceSets.compatTest; loadedMods.set([mods.jevcraft_test_helper])
+            gameDirectory = file(findProperty('jevcraftClientDir') ?: 'runs/hidden-compat-client')
+            systemProperty 'jevcraft.hiddenClient', 'true'; systemProperty 'jevcraft.vanillaCompatTest', 'true'
+            systemProperty 'jevcraft.testPort', (findProperty('jevcraftTestPort') ?: '25576').toString()
+            jvmArgument '-Xmx2G'
+        }
         persistenceServer {
-            server(); gameDirectory = file(findProperty('jevcraftPersistenceDir') ?: 'runs/persistence-server')
+            server(); loadedMods.set([mods.jevcraft]); gameDirectory = file(findProperty('jevcraftPersistenceDir') ?: 'runs/persistence-server')
             programArgument '--nogui'; systemProperty 'jevcraft.persistenceTest', (findProperty('jevcraftPersistencePhase') ?: '').toString()
             systemProperty 'jevcraft.benchmarkActors', (findProperty('jevcraftBenchmarkActors') ?: '1').toString(); jvmArgument '-Xmx2G'
         }
-    }
-    mods { jevcraft { sourceSet sourceSets.main } }
-}
-
-sourceSets {
-    clientOnly {
-        compileClasspath += sourceSets.main.output + configurations.compileClasspath
-        runtimeClasspath += output + compileClasspath
     }
 }
 
@@ -59,6 +83,10 @@ dependencies {
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 tasks.named('test') { useJUnitPlatform() }
 tasks.named('processResources') {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
+}
+tasks.named('processClientOnlyResources') {
     inputs.property 'version', project.version
     filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
 }
@@ -87,12 +115,6 @@ tasks.named('processResources') { dependsOn 'generateTestTemplates' }
 tasks.register('clientOnlyJar', Jar) {
     archiveBaseName = 'jevcraft-client'
     dependsOn tasks.named('clientOnlyClasses')
-    from(sourceSets.main.output) {
-        include 'dev/jevcraft/core/**'
-        include 'dev/jevcraft/inference/**'
-        include 'dev/jevcraft/client/TakeoverRuntime*.class'
-        include 'dev/jevcraft/client/TakeoverScreen.class'
-    }
     from sourceSets.clientOnly.output
     filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
     manifest { attributes 'Implementation-Version': project.version }
