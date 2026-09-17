@@ -23,6 +23,7 @@ import net.minecraft.world.inventory.GrindstoneMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.LoomMenu;
 import net.minecraft.world.inventory.SmokerMenu;
+import net.minecraft.world.inventory.SmithingMenu;
 import net.minecraft.world.inventory.StonecutterMenu;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
@@ -297,6 +298,16 @@ public final class CompanionInteractionContext {
         menu.clicked(itemMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(itemMenu,0,ClickType.PICKUP,actor);menu.clicked(lapisMenu,0,ClickType.PICKUP,actor);menu.clicked(1,1,ClickType.PICKUP,actor);menu.clicked(lapisMenu,0,ClickType.PICKUP,actor);
         if(menu.costs[option]<=0||menu.costs[option]>levelBefore||!menu.clickMenuButton(actor,option)){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(0).getItem().copy();menu.removed(actor);syncFromPlayer(actor);companion.setExperience(actor.experienceLevel,actor.totalExperience,actor.experienceProgress);
         boolean exact=countItem(companion.inventory(),input)==0&&countItem(companion.inventory(),result)>=result.getCount()&&countItem(companion.inventory(),lapis)==lapisBefore-(option+1)&&companion.experienceLevel()==levelBefore-(option+1);clearPlayer(actor);return exact;
+    }
+
+    /** Completes one three-input upgrade through the real smithing result callback. */
+    public boolean smith(ServerLevel level,BlockHitResult hit,int templateSlot,int baseSlot,int additionSlot){
+        if(templateSlot<0||baseSlot<0||additionSlot<0||templateSlot==baseSlot||templateSlot==additionSlot||baseSlot==additionSlot||templateSlot>=companion.inventory().getContainerSize()||baseSlot>=companion.inventory().getContainerSize()||additionSlot>=companion.inventory().getContainerSize())return false;
+        ItemStack template=companion.inventory().getItem(templateSlot).copy(),base=companion.inventory().getItem(baseSlot).copy(),addition=companion.inventory().getItem(additionSlot).copy();if(template.isEmpty()||base.isEmpty()||addition.isEmpty())return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int destination=emptySlot();if(destination<0){clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);if(!access.consumesAction()){clearPlayer(actor);return false;}
+        SmithingMenu menu=new SmithingMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int[] sources={playerMenuSlot(menu,actor,templateSlot),playerMenuSlot(menu,actor,baseSlot),playerMenuSlot(menu,actor,additionSlot)};int destinationMenu=playerMenuSlot(menu,actor,destination);if(sources[0]<0||sources[1]<0||sources[2]<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
+        for(int i=0;i<3;i++){menu.clicked(sources[i],0,ClickType.PICKUP,actor);menu.clicked(i,1,ClickType.PICKUP,actor);menu.clicked(sources[i],0,ClickType.PICKUP,actor);}int resultSlot=menu.getResultSlot();if(!menu.getSlot(resultSlot).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(resultSlot).getItem().copy();menu.clicked(resultSlot,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
+        boolean exact=countItem(companion.inventory(),template)==template.getCount()-1&&countItem(companion.inventory(),base)==base.getCount()-1&&countItem(companion.inventory(),addition)==addition.getCount()-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){

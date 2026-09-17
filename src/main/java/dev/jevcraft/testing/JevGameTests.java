@@ -363,6 +363,13 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionUpgradesSwordThroughSmithingMenu(GameTestHelper helper) {
+        BlockPos tablePos=new BlockPos(3,1,2);helper.setBlock(tablePos,Blocks.SMITHING_TABLE);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE));entity.inventory().setItem(1,new ItemStack(Items.DIAMOND_SWORD));entity.inventory().setItem(2,new ItemStack(Items.NETHERITE_INGOT));BlockPos absolute=helper.absolutePos(tablePos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().smith(helper.getLevel(),hit,0,1,2),"smithing-table menu transaction failed");int template=0,diamond=0,ingot=0,netherite=0;for(int i=0;i<entity.inventory().getContainerSize();i++){ItemStack stack=entity.inventory().getItem(i);if(stack.is(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE))template+=stack.getCount();if(stack.is(Items.DIAMOND_SWORD))diamond+=stack.getCount();if(stack.is(Items.NETHERITE_INGOT))ingot+=stack.getCount();if(stack.is(Items.NETHERITE_SWORD))netherite+=stack.getCount();}
+        helper.assertValueEqual(template+diamond+ingot,0,"smithing did not consume exactly one of each input");helper.assertValueEqual(netherite,1,"smithing did not return exactly one netherite sword");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));
