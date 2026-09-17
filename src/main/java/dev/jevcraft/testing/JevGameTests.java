@@ -68,6 +68,20 @@ public final class JevGameTests {
         helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"fence-gate navigation did not complete; failure="+entity.actions().lastFailure());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"companion did not emerge beyond closed fence-gate barrier");helper.assertTrue(helper.getBlockState(new BlockPos(3,1,2)).getValue(FenceGateBlock.OPEN),"companion did not open fence gate through normal interaction");});
     }
 
+    @GameTest(template = "empty", timeoutTicks = 260)
+    public static void companionClimbsLaddersAndScaffolding(GameTestHelper helper){
+        for(int y=0;y<=6;y++)helper.setBlock(new BlockPos(2,y,2),Blocks.STONE);for(int y=1;y<=5;y++)helper.setBlock(new BlockPos(3,y,2),Blocks.LADDER.defaultBlockState().setValue(net.minecraft.world.level.block.LadderBlock.FACING,Direction.EAST));helper.setBlock(new BlockPos(6,0,2),Blocks.STONE);for(int y=1;y<=5;y++)helper.setBlock(new BlockPos(6,y,2),Blocks.SCAFFOLDING);
+        JevCompanion ladder=helper.spawn(JevCraft.JEV.get(),new BlockPos(3,1,2)),scaffold=helper.spawn(JevCraft.JEV.get(),new BlockPos(6,1,2));ladder.acceptGoal("climb ladder");scaffold.acceptGoal("climb scaffolding");Vec3 ladderTop=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(3,5,2))),scaffoldTop=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,5,2)));helper.runAfterDelay(2,()->{ladder.actions().beginClimb(ladderTop,ladder.goalVersion());scaffold.actions().beginClimb(scaffoldTop,scaffold.goalVersion());});
+        helper.succeedWhen(()->{helper.assertValueEqual(ladder.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"ladder climb failed: "+ladder.actions().lastFailure()+" pos="+ladder.position());helper.assertValueEqual(scaffold.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"scaffolding climb failed: "+scaffold.actions().lastFailure()+" pos="+scaffold.position());helper.assertTrue(ladder.getY()>=ladderTop.y-.35&&scaffold.getY()>=scaffoldTop.y-.35,"vertical traversal stopped below requested height");});
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 320)
+    public static void companionSwimsSurfacesAndDives(GameTestHelper helper){
+        for(int x=0;x<=10;x++)for(int z=0;z<=6;z++){helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);for(int y=1;y<=3;y++)if(x==0||x==10||z==0||z==6)helper.setBlock(new BlockPos(x,y,z),Blocks.STONE);else helper.setBlock(new BlockPos(x,y,z),Blocks.WATER);}
+        JevCompanion traveler=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,2,2)),diver=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,3,4));traveler.acceptGoal("swim across pool");diver.acceptGoal("dive underwater");Vec3 travelTarget=Vec3.atCenterOf(helper.absolutePos(new BlockPos(8,3,2))),diveTarget=Vec3.atCenterOf(helper.absolutePos(new BlockPos(2,1,4)));helper.runAfterDelay(4,()->{traveler.actions().beginSwim(travelTarget,traveler.goalVersion());diver.actions().beginSwim(diveTarget,diver.goalVersion());});
+        helper.succeedWhen(()->{helper.assertValueEqual(traveler.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"surface swim failed: "+traveler.actions().lastFailure()+" pos="+traveler.position());helper.assertValueEqual(diver.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"dive failed: "+diver.actions().lastFailure()+" pos="+diver.position());helper.assertTrue(traveler.distanceToSqr(travelTarget)<=1.5&&diver.distanceToSqr(diveTarget)<=1.5,"swim completion was outside validated target radius");});
+    }
+
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionBodyInventoryAndGoalPersist(GameTestHelper helper) {
         UUID owner = UUID.randomUUID(), administrator = UUID.randomUUID();

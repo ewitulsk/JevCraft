@@ -6,6 +6,9 @@ import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -32,6 +35,10 @@ public final class CompanionActionExecutor {
     private Vec3 movementTarget;
     private double movementSpeed;
     private int movementTicks;
+    private Vec3 climbTarget;
+    private int climbTicks;
+    private Vec3 swimTarget;
+    private int swimTicks;
     private String lastFailure="";
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
@@ -40,15 +47,17 @@ public final class CompanionActionExecutor {
         this.companion = companion; this.interactions = new CompanionInteractionContext(companion);
     }
     public void beginMine(BlockPos target, long goalVersion) {
-        miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;
+        miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginRangedAttack(LivingEntity target,int bowSlot,int ammoSlot,long goalVersion){
-        rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;
+        rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginMove(Vec3 target,double speed,long goalVersion){
-        movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;companion.getNavigation().stop();
+        movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();
     }
-    public void cancel() { miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0; companion.getNavigation().stop(); }
+    public void beginClimb(Vec3 target,long goalVersion){climbTarget=Objects.requireNonNull(target);climbTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();}
+    public void beginSwim(Vec3 target,long goalVersion){swimTarget=Objects.requireNonNull(target);swimTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;companion.getNavigation().stop();}
+    public void cancel() { miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public String lastFailure(){return lastFailure;}
@@ -162,6 +171,8 @@ public final class CompanionActionExecutor {
 
     public Result tick(ServerLevel level) {
         if(rangedTarget!=null) return tickRanged(level);
+        if(swimTarget!=null)return tickSwim(level);
+        if(climbTarget!=null)return tickClimb(level);
         if(movementTarget!=null)return tickMove(level);
         if (miningTarget == null) return Result.IDLE;
         if (actionGoalVersion != companion.goalVersion()) { cancel(); return lastResult = Result.INVALID; }
@@ -194,6 +205,15 @@ public final class CompanionActionExecutor {
         openNearbyFenceGates(level);
         if(companion.getNavigation().isDone()||movementTicks%10==1)if(!companion.getNavigation().moveTo(movementTarget.x,movementTarget.y,movementTarget.z,movementSpeed)){lastFailure="no_path";cancel();return lastResult=Result.INVALID;}
         companion.getLookControl().setLookAt(movementTarget);return lastResult=Result.MOVING;
+    }
+    private Result tickClimb(ServerLevel level){
+        if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}if(++climbTicks>240){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}if(companion.getY()>=climbTarget.y-.35&&Math.abs(companion.getX()-climbTarget.x)<=.8&&Math.abs(companion.getZ()-climbTarget.z)<=.8){companion.setDeltaMovement(companion.getDeltaMovement().multiply(.25,0,.25));climbTarget=null;climbTicks=0;return lastResult=Result.SUCCEEDED;}
+        BlockPos feet=companion.blockPosition();BlockState state=level.getBlockState(feet),below=level.getBlockState(feet.below());boolean climbable=state.is(BlockTags.CLIMBABLE)||state.is(Blocks.SCAFFOLDING)||below.is(BlockTags.CLIMBABLE)||below.is(Blocks.SCAFFOLDING);if(!climbable&&climbTicks>12){lastFailure="left_climbable_surface";cancel();return lastResult=Result.INVALID;}
+        double dx=Mth.clamp(climbTarget.x-companion.getX(),-.08,.08),dz=Mth.clamp(climbTarget.z-companion.getZ(),-.08,.08);companion.setDeltaMovement(dx,.22,dz);companion.fallDistance=0;companion.getLookControl().setLookAt(climbTarget);return lastResult=Result.MOVING;
+    }
+    private Result tickSwim(ServerLevel level){
+        if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}if(++swimTicks>400){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}if(companion.distanceToSqr(swimTarget)<=1.5){Vec3 correction=swimTarget.subtract(companion.position());companion.setSwimming(true);companion.setDeltaMovement(correction.scale(.08));return lastResult=Result.SUCCEEDED;}if(!companion.isInWater()&&swimTicks>12){lastFailure="left_water";cancel();return lastResult=Result.INVALID;}
+        Vec3 delta=swimTarget.subtract(companion.position()),direction=delta.normalize();companion.setSwimming(true);companion.setDeltaMovement(direction.x*.16,Mth.clamp(delta.y,-.12,.16),direction.z*.16);companion.getLookControl().setLookAt(swimTarget);return lastResult=Result.MOVING;
     }
     private void openNearbyFenceGates(ServerLevel level){
         BlockPos center=companion.blockPosition();
