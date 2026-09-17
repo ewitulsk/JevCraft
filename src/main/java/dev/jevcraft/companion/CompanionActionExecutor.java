@@ -31,8 +31,15 @@ public final class CompanionActionExecutor {
     public Result lastResult() { return lastResult; }
     public float miningProgress() { return miningProgress; }
     public InteractionResult place(ServerLevel level, BlockHitResult hit, int inventorySlot) {
+        return useBlock(level,hit,inventorySlot);
+    }
+    public InteractionResult useBlock(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         if (companion.distanceToSqr(hit.getLocation()) > 25) return InteractionResult.FAIL;
         return interactions.useItemOn(level, hit, inventorySlot);
+    }
+    public InteractionResult useItem(ServerLevel level, Vec3 aim, int inventorySlot) {
+        if(companion.distanceToSqr(aim)>25) return InteractionResult.FAIL;
+        return interactions.useItem(level,aim,inventorySlot);
     }
     public boolean attack(ServerLevel level, LivingEntity target, int inventorySlot) {
         if (!target.isAlive() || companion.distanceToSqr(target) > 16) return false;

@@ -15,6 +15,8 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.Mth;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
 
@@ -60,6 +62,14 @@ public final class CompanionInteractionContext {
         companion.inventory().setItem(slot, actor.getInventory().getItem(0).copy());
         actor.getInventory().setItem(0, ItemStack.EMPTY);
         return result;
+    }
+
+    public InteractionResult useItem(ServerLevel level, Vec3 aim, int slot) {
+        FakePlayer actor=player(level); Vec3 delta=aim.subtract(actor.getEyePosition()); double horizontal=Math.sqrt(delta.x*delta.x+delta.z*delta.z);
+        actor.setYRot((float)(Mth.atan2(delta.z,delta.x)*180/Math.PI)-90); actor.setYHeadRot(actor.getYRot()); actor.setXRot((float)-(Mth.atan2(delta.y,horizontal)*180/Math.PI));
+        actor.getInventory().selected=0; actor.getInventory().setItem(0,companion.inventory().getItem(slot).copy());
+        InteractionResult result=actor.gameMode.useItem(actor,level,actor.getInventory().getItem(0),InteractionHand.MAIN_HAND);
+        companion.inventory().setItem(slot,actor.getInventory().getItem(0).copy()); actor.getInventory().setItem(0,ItemStack.EMPTY); return result;
     }
 
     public void attack(ServerLevel level, Entity target, int slot) {

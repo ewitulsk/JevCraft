@@ -20,6 +20,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.portal.DimensionTransition;
+import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -170,6 +172,46 @@ public final class JevGameTests {
         helper.assertValueEqual(first.inventory().getItem(0).getCount(),1,"first inventory consumption was not isolated");
         helper.assertValueEqual(second.inventory().getItem(0).getCount(),2,"second inventory consumption was not isolated");
         helper.assertTrue(first.inventory().getItem(0).is(Items.COBBLESTONE)&&second.inventory().getItem(0).is(Items.DIRT),"interaction contexts crossed inventory identities");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionPlacesAndCollectsWaterWithBucketCallbacks(GameTestHelper helper) {
+        BlockPos support=new BlockPos(3,0,2),water=support.above(); helper.setBlock(support,Blocks.STONE);
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.inventory().setItem(0,new ItemStack(Items.WATER_BUCKET));
+        BlockPos absoluteSupport=helper.absolutePos(support),absoluteWater=helper.absolutePos(water);
+        helper.assertTrue(entity.actions().useItem(helper.getLevel(),new Vec3(absoluteSupport.getX()+.5,absoluteSupport.getY()+1,absoluteSupport.getZ()+.5),0).consumesAction(),"water bucket placement callback failed");
+        helper.assertTrue(helper.getLevel().getFluidState(absoluteWater).is(net.minecraft.tags.FluidTags.WATER),"water bucket did not place authoritative fluid");
+        helper.assertTrue(entity.inventory().getItem(0).is(Items.BUCKET),"water placement did not return an empty bucket");
+        helper.assertTrue(entity.actions().useItem(helper.getLevel(),Vec3.atCenterOf(absoluteWater),0).consumesAction(),"empty bucket pickup callback failed");
+        helper.assertTrue(helper.getLevel().getFluidState(absoluteWater).isEmpty(),"bucket pickup did not remove source fluid");
+        helper.assertTrue(entity.inventory().getItem(0).is(Items.WATER_BUCKET),"bucket pickup did not return a water bucket");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionHoesAndPlantsThroughItemCallbacks(GameTestHelper helper) {
+        BlockPos soil=new BlockPos(3,0,2); helper.setBlock(soil,Blocks.DIRT);
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.inventory().setItem(0,new ItemStack(Items.IRON_HOE)); entity.inventory().setItem(1,new ItemStack(Items.WHEAT_SEEDS,2));
+        BlockPos absolute=helper.absolutePos(soil); BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().useBlock(helper.getLevel(),hit,0).consumesAction(),"hoe use callback failed");
+        helper.assertTrue(helper.getLevel().getBlockState(absolute).is(Blocks.FARMLAND),"hoe did not create authoritative farmland");
+        helper.assertTrue(entity.inventory().getItem(0).getDamageValue()>0,"hoe callback did not apply durability");
+        helper.assertTrue(entity.actions().useBlock(helper.getLevel(),hit,1).consumesAction(),"seed use callback failed");
+        helper.assertTrue(helper.getLevel().getBlockState(absolute.above()).is(Blocks.WHEAT),"seed callback did not plant a crop");
+        helper.assertValueEqual(entity.inventory().getItem(1).getCount(),1,"planting did not consume exactly one seed");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionTogglesLeverThroughBlockCallback(GameTestHelper helper) {
+        BlockPos support=new BlockPos(3,0,2),lever=support.above(); helper.setBlock(support,Blocks.STONE);
+        helper.setBlock(lever,Blocks.LEVER.defaultBlockState().setValue(BlockStateProperties.ATTACH_FACE,AttachFace.FLOOR).setValue(BlockStateProperties.HORIZONTAL_FACING,Direction.NORTH));
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));
+        BlockPos absolute=helper.absolutePos(lever);
+        helper.assertTrue(!helper.getLevel().getBlockState(absolute).getValue(BlockStateProperties.POWERED),"lever started powered");
+        helper.assertTrue(entity.actions().useBlock(helper.getLevel(),new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false),0).consumesAction(),"lever interaction callback failed");
+        helper.assertTrue(helper.getLevel().getBlockState(absolute).getValue(BlockStateProperties.POWERED),"lever did not toggle authoritative powered state");
         helper.succeed();
     }
 
