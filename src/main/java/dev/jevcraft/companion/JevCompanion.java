@@ -17,6 +17,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.*;
@@ -66,6 +67,23 @@ public final class JevCompanion extends PathfinderMob {
         if (cx == lastChunkX && cz == lastChunkZ) return;
         MovingChunkTickets.move(level, this, lastChunkX, lastChunkZ, cx, cz, 2);
         lastChunkX = cx; lastChunkZ = cz;
+    }
+    @Override public Entity changeDimension(DimensionTransition transition) {
+        ServerLevel destination=transition.newLevel(); BlockPos target=BlockPos.containing(transition.pos());
+        boolean crossDimension=level()!=destination;
+        if(crossDimension) MovingChunkTickets.prepare(destination,this,target.getX()>>4,target.getZ()>>4,2);
+        Entity transferred=super.changeDimension(transition);
+        if(crossDimension&&transferred==null) MovingChunkTickets.release(destination,this,target.getX()>>4,target.getZ()>>4,2);
+        else if(transferred instanceof JevCompanion replacement) replacement.activateChunkTickets(destination);
+        return transferred;
+    }
+    @Override public boolean teleportTo(ServerLevel destination,double x,double y,double z,Set<RelativeMovement> relative,float yRot,float xRot){
+        boolean crossDimension=level()!=destination; int chunkX=BlockPos.containing(x,y,z).getX()>>4,chunkZ=BlockPos.containing(x,y,z).getZ()>>4;
+        if(crossDimension) MovingChunkTickets.prepare(destination,this,chunkX,chunkZ,2);
+        boolean transferred=super.teleportTo(destination,x,y,z,relative,yRot,xRot);
+        if(crossDimension&&!transferred) MovingChunkTickets.release(destination,this,chunkX,chunkZ,2);
+        else if(crossDimension&&destination.getEntity(getUUID()) instanceof JevCompanion replacement) replacement.activateChunkTickets(destination);
+        return transferred;
     }
     private void applySimpleGoal(ServerLevel level) {
         if (currentGoal.isBlank() || owner == null) return;
@@ -216,11 +234,18 @@ public final class JevCompanion extends PathfinderMob {
         long delay = Math.max(20, Math.min(12000, Long.getLong("jevcraft.respawnTicks", 100L)));
         JevWorldData.get(level.getServer()).queueRespawn(getUUID(), respawnState, level.getGameTime() + delay);
     }
+    @Override public void remove(Entity.RemovalReason reason) {
+        if(!level().isClientSide&&level() instanceof ServerLevel serverLevel&&lastChunkX!=Integer.MIN_VALUE&&!reason.shouldSave()){
+            MovingChunkTickets.release(serverLevel,this,lastChunkX,lastChunkZ,2); lastChunkX=Integer.MIN_VALUE; lastChunkZ=Integer.MIN_VALUE;
+        }
+        super.remove(reason);
+    }
     @Override public void onRemovedFromLevel() {
         Entity.RemovalReason reason = getRemovalReason();
         if (!level().isClientSide && level() instanceof ServerLevel serverLevel && lastChunkX != Integer.MIN_VALUE
                 && (reason == null || !reason.shouldSave()))
             MovingChunkTickets.release(serverLevel, this, lastChunkX, lastChunkZ, 2);
+        lastChunkX=Integer.MIN_VALUE; lastChunkZ=Integer.MIN_VALUE;
         super.onRemovedFromLevel();
     }
     @Override public boolean removeWhenFarAway(double distance) { return false; }

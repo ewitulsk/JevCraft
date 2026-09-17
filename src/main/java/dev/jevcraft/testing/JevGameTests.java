@@ -4,6 +4,7 @@ import dev.jevcraft.JevCraft;
 import dev.jevcraft.companion.JevCompanion;
 import dev.jevcraft.companion.JevInferenceHost;
 import dev.jevcraft.companion.JevWorldData;
+import dev.jevcraft.companion.MovingChunkTickets;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -16,6 +17,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -108,6 +112,28 @@ public final class JevGameTests {
         helper.assertTrue(entity.actions().teleport(helper.getLevel(), destination), "operator-authorized teleport failed");
         helper.assertTrue(entity.position().distanceToSqr(destination) < .01, "teleport did not reach verified destination");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void portalTransferMovesTickingRegionBetweenDimensions(GameTestHelper helper) {
+        var server=helper.getLevel().getServer(); var overworld=helper.getLevel(); var nether=server.getLevel(Level.NETHER);
+        helper.assertTrue(nether!=null,"Nether level was unavailable");
+        int overworldBefore=MovingChunkTickets.tickingTicketCount(overworld),netherBefore=MovingChunkTickets.tickingTicketCount(nether);
+        JevCompanion original=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));
+        JevWorldData.get(server).register(original.getUUID(),"PortalJev");
+        helper.assertValueEqual(MovingChunkTickets.tickingTicketCount(overworld),overworldBefore+25,"source ticking region was not activated");
+        Vec3 destination=new Vec3(8.5,80,8.5);
+        Entity transferred=original.changeDimension(new DimensionTransition(nether,destination,Vec3.ZERO,0,0,DimensionTransition.PLACE_PORTAL_TICKET));
+        helper.assertTrue(transferred instanceof JevCompanion,"portal transition did not recreate the companion");
+        helper.assertTrue(transferred.level()==nether&&transferred.getUUID().equals(original.getUUID()),"portal transition lost dimension or identity");
+        helper.assertValueEqual(MovingChunkTickets.tickingTicketCount(overworld),overworldBefore,"source ticking region leaked after portal transition");
+        helper.assertValueEqual(MovingChunkTickets.tickingTicketCount(nether),netherBefore+25,"destination ticking region was not activated");
+        transferred.discard();
+        helper.runAfterDelay(2,()->{
+            JevWorldData.get(server).unregister(transferred.getUUID());
+            helper.assertValueEqual(MovingChunkTickets.tickingTicketCount(nether),netherBefore,"destination ticking region leaked after removal");
+            helper.succeed();
+        });
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
