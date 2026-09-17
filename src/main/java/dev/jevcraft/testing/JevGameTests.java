@@ -31,6 +31,8 @@ public final class JevGameTests {
         UUID owner = UUID.randomUUID(), administrator = UUID.randomUUID();
         JevCompanion original = helper.spawn(JevCraft.JEV.get(), new BlockPos(2, 1, 2));
         original.setOwner(owner); original.addAdministrator(administrator); original.acceptGoal("follow me"); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 4));
+        original.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.IRON_HELMET)); original.setExperience(7, 91, .4f);
+        original.setOperatorTeleportAllowed(true); original.setRespawnPoint(helper.getLevel().dimension(), helper.absolutePos(new BlockPos(4, 1, 4)), 45);
         CompoundTag saved = new CompoundTag(); original.addAdditionalSaveData(saved);
         JevCompanion restored = JevCraft.JEV.get().create(helper.getLevel());
         helper.assertTrue(restored != null, "registered companion type did not create");
@@ -39,6 +41,10 @@ public final class JevGameTests {
         helper.assertTrue(restored.administrators().contains(administrator), "administrator UUID persistence");
         helper.assertValueEqual(restored.currentGoal(), "follow me", "goal persistence");
         helper.assertValueEqual(restored.inventory().getItem(0).getCount(), 4, "inventory persistence");
+        helper.assertTrue(restored.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(Items.IRON_HELMET), "equipment persistence");
+        helper.assertValueEqual(restored.experienceLevel(), 7, "experience level persistence"); helper.assertValueEqual(restored.totalExperience(), 91, "total experience persistence");
+        helper.assertTrue(Math.abs(restored.experienceProgress() - .4f) < .001f, "experience progress persistence");
+        helper.assertTrue(restored.operatorTeleportAllowed(), "operator teleport flag persistence"); helper.assertValueEqual(restored.respawnDimension(), helper.getLevel().dimension(), "spawn dimension persistence");
         original.stopNow(); helper.assertTrue(original.currentGoal().isEmpty(), "stop did not synchronously clear goal");
         helper.succeed();
     }
@@ -90,6 +96,17 @@ public final class JevGameTests {
         helper.assertTrue(result.consumesAction(), "normal use pipeline rejected placement");
         helper.assertTrue(helper.getLevel().getBlockState(helper.absolutePos(destination)).is(Blocks.COBBLESTONE), "placement did not change authoritative world state");
         helper.assertValueEqual(entity.inventory().getItem(0).getCount(), 1, "placement did not consume exactly one block");
+        helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void teleportRequiresSeparateOperatorCapability(GameTestHelper helper) {
+        JevCompanion entity = helper.spawn(JevCraft.JEV.get(), new BlockPos(2, 1, 2));
+        Vec3 destination = Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(5, 1, 2)));
+        helper.assertTrue(!entity.actions().teleport(helper.getLevel(), destination), "ownership-free body received teleport authority");
+        entity.setOperatorTeleportAllowed(true);
+        helper.assertTrue(entity.actions().teleport(helper.getLevel(), destination), "operator-authorized teleport failed");
+        helper.assertTrue(entity.position().distanceToSqr(destination) < .01, "teleport did not reach verified destination");
         helper.succeed();
     }
 
@@ -195,6 +212,7 @@ public final class JevGameTests {
         original.setUUID(id); original.setOwner(owner); original.addAdministrator(admin); original.setCustomName(net.minecraft.network.chat.Component.literal("RespawnJev"));
         original.acceptGoal("follow me"); original.observeChat(owner, "persistent memory", true, true); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 3));
         BlockPos spawn = helper.absolutePos(new BlockPos(2, 1, 2)); original.moveTo(spawn.getX() + .5, spawn.getY(), spawn.getZ() + .5, 0, 0);
+        original.setRespawnPoint(helper.getLevel().dimension(), spawn, 30);
         helper.assertTrue(data.register(id, "RespawnJev"), "could not reserve lifecycle roster slot");
         helper.assertTrue(helper.getLevel().addFreshEntity(original), "could not add lifecycle Jev");
         original.kill();
@@ -225,6 +243,12 @@ public final class JevGameTests {
         entity.setCustomName(net.minecraft.network.chat.Component.literal("JevMsgTest")); entity.setOwner(sender.getUUID());
         helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev admin JevMsgTest add test-mock-player");
         helper.assertTrue(entity.administrators().contains(sender.getUUID()), "owner could not add a UUID administrator");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev operator JevMsgTest enable");
+        helper.assertTrue(!entity.operatorTeleportAllowed(), "ordinary owner granted operator teleport authority");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(helper.getLevel().getServer().createCommandSourceStack(), "jev operator JevMsgTest enable");
+        helper.assertTrue(entity.operatorTeleportAllowed(), "server operator could not grant teleport authority");
+        helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "jev setspawn JevMsgTest");
+        helper.assertValueEqual(entity.respawnPosition(), sender.blockPosition(), "authorized owner could not set companion spawn");
         helper.getLevel().getServer().getCommands().performPrefixedCommand(sender.createCommandSourceStack(), "msg JevMsgTest follow me");
         helper.assertValueEqual(entity.currentGoal(), "follow me", "native /msg did not route to the named Jev");
         helper.assertTrue(entity.recentChat().get(entity.recentChat().size()-1).privateMessage(), "private message provenance missing");

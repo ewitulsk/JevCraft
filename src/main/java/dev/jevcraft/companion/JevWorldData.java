@@ -3,10 +3,15 @@ package dev.jevcraft.companion;
 import dev.jevcraft.JevCraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.*;
@@ -64,18 +69,31 @@ public final class JevWorldData extends SavedData {
             for (var level : server.getAllLevels()) for (var entity : level.getAllEntities())
                 if (entity instanceof JevCompanion jev && jev.getUUID().equals(entry.getKey())) { alreadyPresent = true; break; }
             if (!alreadyPresent) {
-                var level = server.overworld(); JevCompanion replacement = JevCraft.JEV.get().create(level);
+                ServerLevel level = server.overworld();
+                CompoundTag state = entry.getValue().state();
+                if (state.contains("RespawnDimension")) {
+                    ResourceLocation id = ResourceLocation.tryParse(state.getString("RespawnDimension"));
+                    if (id != null) { ServerLevel selected = server.getLevel(ResourceKey.create(Registries.DIMENSION, id)); if (selected != null) level = selected; }
+                }
+                JevCompanion replacement = JevCraft.JEV.get().create(level);
                 if (replacement == null) continue;
-                replacement.setUUID(entry.getKey()); replacement.readAdditionalSaveData(entry.getValue().state());
+                replacement.setUUID(entry.getKey()); replacement.readAdditionalSaveData(state);
                 replacement.setHealth(replacement.getMaxHealth()); replacement.setCustomName(net.minecraft.network.chat.Component.literal(living.get(entry.getKey()))); replacement.setCustomNameVisible(true);
-                BlockPos spawn = level.getSharedSpawnPos();
-                if (!level.getBlockState(spawn.below()).isSolidRender(level, spawn.below()) && entry.getValue().state().contains("RespawnFallbackPos"))
-                    spawn = BlockPos.of(entry.getValue().state().getLong("RespawnFallbackPos"));
-                replacement.moveTo(spawn.getX() + .5, spawn.getY(), spawn.getZ() + .5, 0, 0);
+                BlockPos spawn = state.contains("RespawnPosition") ? BlockPos.of(state.getLong("RespawnPosition")) : level.getSharedSpawnPos();
+                if (!safe(level, spawn)) {
+                    BlockPos worldSpawn = level.getSharedSpawnPos();
+                    if (safe(level, worldSpawn)) spawn = worldSpawn;
+                    else if (state.contains("RespawnFallbackPos")) spawn = BlockPos.of(state.getLong("RespawnFallbackPos"));
+                }
+                replacement.moveTo(spawn.getX() + .5, spawn.getY(), spawn.getZ() + .5, state.getFloat("RespawnAngle"), 0);
                 if (!level.addFreshEntity(replacement)) continue;
             }
             iterator.remove(); setDirty();
         }
+    }
+    private static boolean safe(ServerLevel level, BlockPos feet) {
+        return level.getBlockState(feet.below()).isSolidRender(level, feet.below()) && level.getBlockState(feet).getCollisionShape(level, feet).isEmpty()
+                && level.getBlockState(feet.above()).getCollisionShape(level, feet.above()).isEmpty();
     }
 
     @Override public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {

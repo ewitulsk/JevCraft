@@ -3,6 +3,9 @@ package dev.jevcraft.companion;
 import dev.jevcraft.core.GoalParser;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -32,6 +35,12 @@ public final class JevCompanion extends PathfinderMob {
     private String currentGoal = "";
     private long goalVersion;
     private int food = 20;
+    private int experienceLevel, totalExperience;
+    private float experienceProgress;
+    private boolean operatorTeleportAllowed;
+    private ResourceKey<Level> respawnDimension;
+    private BlockPos respawnPosition;
+    private float respawnAngle;
     private int lastChunkX = Integer.MIN_VALUE, lastChunkZ = Integer.MIN_VALUE;
     private final CompanionActionExecutor actions = new CompanionActionExecutor(this);
     private final Deque<ChatObservation> recentChat = new ArrayDeque<>();
@@ -123,6 +132,16 @@ public final class JevCompanion extends PathfinderMob {
     public String currentGoal() { return currentGoal; }
     public long goalVersion() { return goalVersion; }
     public int foodLevel() { return food; }
+    public int experienceLevel() { return experienceLevel; }
+    public int totalExperience() { return totalExperience; }
+    public float experienceProgress() { return experienceProgress; }
+    public void setExperience(int level, int total, float progress) { experienceLevel = Math.max(0, level); totalExperience = Math.max(0, total); experienceProgress = Math.max(0, Math.min(1, progress)); }
+    public boolean operatorTeleportAllowed() { return operatorTeleportAllowed; }
+    public void setOperatorTeleportAllowed(boolean allowed) { operatorTeleportAllowed = allowed; }
+    public void setRespawnPoint(ResourceKey<Level> dimension, BlockPos position, float angle) { respawnDimension = dimension; respawnPosition = position.immutable(); respawnAngle = angle; }
+    public ResourceKey<Level> respawnDimension() { return respawnDimension; }
+    public BlockPos respawnPosition() { return respawnPosition; }
+    public float respawnAngle() { return respawnAngle; }
     public SimpleContainer inventory() { return inventory; }
     public CompanionActionExecutor actions() { return actions; }
     public boolean consumeFood(int slot) {
@@ -156,6 +175,11 @@ public final class JevCompanion extends PathfinderMob {
         for (UUID administrator : administrators) { CompoundTag entry = new CompoundTag(); entry.putUUID("Id", administrator); admins.add(entry); }
         tag.put("Administrators", admins);
         tag.putString("Goal", currentGoal); tag.putLong("GoalVersion", goalVersion); tag.putInt("Food", food);
+        tag.putInt("ExperienceLevel", experienceLevel); tag.putInt("TotalExperience", totalExperience); tag.putFloat("ExperienceProgress", experienceProgress);
+        tag.putBoolean("OperatorTeleportAllowed", operatorTeleportAllowed);
+        if (respawnDimension != null && respawnPosition != null) {
+            tag.putString("RespawnDimension", respawnDimension.location().toString()); tag.putLong("RespawnPosition", respawnPosition.asLong()); tag.putFloat("RespawnAngle", respawnAngle);
+        }
         tag.put("Inventory", inventory.createTag(registryAccess()));
         ListTag chat = new ListTag();
         for (ChatObservation observation : recentChat) {
@@ -172,6 +196,12 @@ public final class JevCompanion extends PathfinderMob {
         administrators.clear();
         for (var value : tag.getList("Administrators", 10)) if (value instanceof CompoundTag entry && entry.hasUUID("Id")) administrators.add(entry.getUUID("Id"));
         currentGoal = tag.getString("Goal"); goalVersion = tag.getLong("GoalVersion"); food = tag.contains("Food") ? tag.getInt("Food") : 20;
+        experienceLevel = Math.max(0, tag.getInt("ExperienceLevel")); totalExperience = Math.max(0, tag.getInt("TotalExperience")); experienceProgress = Math.max(0, Math.min(1, tag.getFloat("ExperienceProgress")));
+        operatorTeleportAllowed = tag.getBoolean("OperatorTeleportAllowed"); respawnDimension = null; respawnPosition = null; respawnAngle = 0;
+        if (tag.contains("RespawnDimension") && tag.contains("RespawnPosition")) {
+            ResourceLocation id = ResourceLocation.tryParse(tag.getString("RespawnDimension"));
+            if (id != null) { respawnDimension = ResourceKey.create(Registries.DIMENSION, id); respawnPosition = BlockPos.of(tag.getLong("RespawnPosition")); respawnAngle = tag.getFloat("RespawnAngle"); }
+        }
         inventory.fromTag(tag.getList("Inventory", 10), registryAccess());
         recentChat.clear();
         for (var value : tag.getList("RecentChat", 10)) if (value instanceof CompoundTag entry && entry.hasUUID("Sender"))

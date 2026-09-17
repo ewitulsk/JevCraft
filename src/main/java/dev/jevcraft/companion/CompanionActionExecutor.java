@@ -6,6 +6,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Objects;
 
@@ -43,6 +44,13 @@ public final class CompanionActionExecutor {
     public boolean craftSingleIngredient(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         if (companion.distanceToSqr(hit.getLocation()) > 25) return false;
         return interactions.craftSingleIngredient(level, hit, inventorySlot);
+    }
+    public boolean teleport(ServerLevel level, Vec3 destination) {
+        if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
+        BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);
+        MovingChunkTickets.prepare(level, companion, target.getX() >> 4, target.getZ() >> 4, 2);
+        companion.teleportTo(level, destination.x, destination.y, destination.z, java.util.Set.of(), companion.getYRot(), companion.getXRot());
+        return companion.distanceToSqr(destination) < .01;
     }
 
     public Result tick(ServerLevel level) {

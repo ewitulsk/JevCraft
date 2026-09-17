@@ -27,4 +27,8 @@ public final class MovingChunkTickets {
         for (int x = xCenter - radius; x <= xCenter + radius; x++) for (int z = zCenter - radius; z <= zCenter + radius; z++)
             CONTROLLER.forceChunk(level, owner, x, z, false, true);
     }
+    public static void prepare(ServerLevel level, JevCompanion owner, int xCenter, int zCenter, int radius) {
+        for (int x = xCenter - radius; x <= xCenter + radius; x++) for (int z = zCenter - radius; z <= zCenter + radius; z++)
+            CONTROLLER.forceChunk(level, owner, x, z, true, true);
+    }
 }
