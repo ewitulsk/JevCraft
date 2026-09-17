@@ -133,6 +133,14 @@ public final class CompanionActionExecutor {
     public boolean equipInventoryStack(ServerLevel level,int sourceSlot,EquipmentSlot equipmentSlot){
         return interactions.equipInventoryStack(level,sourceSlot,equipmentSlot);
     }
+    public java.util.List<String> readSign(ServerLevel level,BlockPos pos,boolean front){
+        return companion.distanceToSqr(Vec3.atCenterOf(pos))<=25?interactions.readSign(level,pos,front):java.util.List.of();
+    }
+    public boolean writeSign(ServerLevel level,BlockHitResult hit,boolean front,java.util.List<String> lines){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.writeSign(level,hit,front,lines);
+    }
+    public java.util.List<String> readBook(int slot){return interactions.readBook(slot);}
+    public boolean writeBook(int slot,java.util.List<String> pages){return interactions.writeBook(slot,pages);}
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);

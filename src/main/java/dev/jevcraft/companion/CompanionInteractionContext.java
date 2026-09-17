@@ -4,6 +4,10 @@ import com.mojang.authlib.GameProfile;
 import dev.jevcraft.mixin.BeaconBlockEntityAccessor;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.network.Filterable;
+import net.minecraft.server.network.FilteredText;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Item;
@@ -40,8 +44,11 @@ import net.minecraft.world.level.block.entity.BlastFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BrewingStandBlockEntity;
 import net.minecraft.world.level.block.entity.BeaconBlockEntity;
 import net.minecraft.world.level.block.entity.SmokerBlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
+import net.minecraft.world.item.component.WritableBookContent;
+import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.Mth;
@@ -367,6 +374,24 @@ public final class CompanionInteractionContext {
         lastFailure="";if(sourceSlot<0||sourceSlot>=companion.inventory().getContainerSize()||equipmentSlot==null||equipmentSlot==EquipmentSlot.MAINHAND){lastFailure="invalid_input";return false;}ItemStack sourceBefore=companion.inventory().getItem(sourceSlot).copy(),equipmentBefore=companion.getItemBySlot(equipmentSlot).copy();if(sourceBefore.isEmpty()){lastFailure="empty_source";return false;}
         FakePlayer actor=player(level);syncToPlayer(actor);actor.setItemSlot(equipmentSlot,equipmentBefore.copy());var menu=actor.inventoryMenu;menu.setCarried(ItemStack.EMPTY);int sourceMenu=playerMenuSlot(menu,actor,sourceSlot),equipmentIndex=equipmentInventoryIndex(equipmentSlot),equipmentMenu=playerMenuSlot(menu,actor,equipmentIndex);if(sourceMenu<0||equipmentMenu<0){lastFailure="missing_menu_slot";clearPlayer(actor);return false;}
         menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);menu.clicked(equipmentMenu,0,ClickType.PICKUP,actor);if(!menu.getCarried().isEmpty())menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);boolean cursorEmpty=menu.getCarried().isEmpty();syncFromPlayer(actor);ItemStack equipped=actor.getItemBySlot(equipmentSlot).copy();companion.setItemSlot(equipmentSlot,equipped);ItemStack sourceAfter=companion.inventory().getItem(sourceSlot);boolean exact=ItemStack.isSameItemSameComponents(equipped,sourceBefore)&&equipped.getCount()==sourceBefore.getCount()&&(equipmentBefore.isEmpty()?sourceAfter.isEmpty():ItemStack.isSameItemSameComponents(sourceAfter,equipmentBefore)&&sourceAfter.getCount()==equipmentBefore.getCount());if(!cursorEmpty||!exact)lastFailure="equipment_transfer cursor="+menu.getCarried()+" source="+sourceAfter+" equipped="+equipped;menu.setCarried(ItemStack.EMPTY);clearPlayer(actor);return cursorEmpty&&exact;
+    }
+
+    public java.util.List<String> readSign(ServerLevel level,BlockPos pos,boolean front){
+        if(!(level.getBlockEntity(pos) instanceof SignBlockEntity sign))return java.util.List.of();return java.util.Arrays.stream(sign.getText(front).getMessages(false)).map(Component::getString).toList();
+    }
+
+    /** Writes only caller-supplied lines through the same server-side sign update path used by the edit packet. */
+    public boolean writeSign(ServerLevel level,BlockHitResult hit,boolean front,java.util.List<String> lines){
+        lastFailure="";if(lines==null||lines.size()>4||lines.stream().anyMatch(line->line==null||line.length()>384)){lastFailure="invalid_text";return false;}FakePlayer actor=player(level);actor.getInventory().selected=0;actor.getInventory().setItem(0,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);BlockEntity block=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(block instanceof SignBlockEntity sign)||sign.isWaxed()){lastFailure="access_or_waxed";clearPlayer(actor);return false;}java.util.List<FilteredText> supplied=new java.util.ArrayList<>(4);java.util.List<String> expected=new java.util.ArrayList<>(4);for(int i=0;i<4;i++){String line=i<lines.size()?lines.get(i):"";supplied.add(FilteredText.passThrough(line));expected.add(line);}sign.setAllowedPlayerEditor(actor.getUUID());sign.updateSignText(actor,front,supplied);sign.setAllowedPlayerEditor(null);boolean exact=readSign(level,hit.getBlockPos(),front).equals(expected);if(!exact)lastFailure="sign_update_rejected";clearPlayer(actor);return exact;
+    }
+
+    public java.util.List<String> readBook(int slot){
+        if(slot<0||slot>=companion.inventory().getContainerSize())return java.util.List.of();ItemStack stack=companion.inventory().getItem(slot);WritableBookContent writable=stack.get(DataComponents.WRITABLE_BOOK_CONTENT);if(writable!=null)return writable.getPages(false).toList();WrittenBookContent written=stack.get(DataComponents.WRITTEN_BOOK_CONTENT);return written==null?java.util.List.of():written.getPages(false).stream().map(Component::getString).toList();
+    }
+
+    /** Stores supplied pages in a writable book while enforcing vanilla page count and edit-size bounds. */
+    public boolean writeBook(int slot,java.util.List<String> pages){
+        lastFailure="";if(slot<0||slot>=companion.inventory().getContainerSize()||pages==null||pages.size()>100||pages.stream().anyMatch(page->page==null||page.length()>1024)){lastFailure="invalid_text";return false;}ItemStack stack=companion.inventory().getItem(slot);if(!stack.has(DataComponents.WRITABLE_BOOK_CONTENT)){lastFailure="not_writable_book";return false;}java.util.List<Filterable<String>> supplied=pages.stream().map(Filterable::passThrough).toList();stack.set(DataComponents.WRITABLE_BOOK_CONTENT,new WritableBookContent(supplied));boolean exact=readBook(slot).equals(pages);if(!exact)lastFailure="book_update_rejected";return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){

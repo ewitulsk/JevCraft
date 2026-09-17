@@ -229,6 +229,13 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionReadsAndWritesSuppliedSignAndBookText(GameTestHelper helper){
+        BlockPos signPos=new BlockPos(3,1,2);helper.setBlock(signPos,Blocks.OAK_SIGN);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));BlockPos absolute=helper.absolutePos(signPos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.NORTH,absolute,false);java.util.List<String> lines=java.util.List.of("Meet at dawn","Bring 4 logs");
+        helper.assertTrue(entity.actions().writeSign(helper.getLevel(),hit,true,lines),"supplied sign write failed: "+entity.actions().lastInteractionFailure());helper.assertValueEqual(entity.actions().readSign(helper.getLevel(),absolute,true),java.util.List.of("Meet at dawn","Bring 4 logs","",""),"sign readback");helper.assertTrue(helper.getLevel().getBlockEntity(absolute) instanceof net.minecraft.world.level.block.entity.SignBlockEntity,"sign block entity missing");((net.minecraft.world.level.block.entity.SignBlockEntity)helper.getLevel().getBlockEntity(absolute)).setWaxed(true);helper.assertTrue(!entity.actions().writeSign(helper.getLevel(),hit,true,java.util.List.of("tampered")),"waxed sign accepted an edit");helper.assertValueEqual(entity.actions().readSign(helper.getLevel(),absolute,true),java.util.List.of("Meet at dawn","Bring 4 logs","",""),"rejected waxed edit changed sign text");
+        entity.inventory().setItem(9,new ItemStack(Items.WRITABLE_BOOK));java.util.List<String> pages=java.util.List.of("Route: north bridge","Chest by the bed");helper.assertTrue(entity.actions().writeBook(9,pages),"supplied book write failed: "+entity.actions().lastInteractionFailure());helper.assertValueEqual(entity.actions().readBook(9),pages,"book readback");helper.assertTrue(!entity.actions().writeBook(9,java.util.List.of("x".repeat(1025))),"oversized book page was accepted");helper.assertValueEqual(entity.actions().readBook(9),pages,"rejected book edit changed content");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionPlacesAndCollectsWaterWithBucketCallbacks(GameTestHelper helper) {
         BlockPos support=new BlockPos(3,0,2),water=support.above(); helper.setBlock(support,Blocks.STONE);
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.inventory().setItem(0,new ItemStack(Items.WATER_BUCKET));
