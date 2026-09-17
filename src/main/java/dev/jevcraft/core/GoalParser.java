@@ -22,7 +22,7 @@ public final class GoalParser {
                 : contains(lower, "put ", "deposit", "store ") ? Kind.DEPOSIT
                 : contains(lower, "craft", "make ") ? Kind.CRAFT
                 : contains(lower, "mine", "collect", "get ", "gather") ? Kind.ACQUIRE
-                : contains(lower, "build", "wall", "floor", "roof", "bridge") ? Kind.BUILD
+                : contains(lower, "build", "place", "wall", "floor", "roof", "bridge") ? Kind.BUILD
                 : contains(lower, "follow") ? Kind.FOLLOW
                 : contains(lower, "defend", "protect") ? Kind.DEFEND
                 : contains(lower, "go to", "move to", "walk to") ? Kind.MOVE

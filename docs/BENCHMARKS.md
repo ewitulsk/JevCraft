@@ -26,3 +26,7 @@ Measured September 17, 2026 with `gradlew liveGatewayScale`, Vercel AI Gateway, 
 | 10 | 3 | 30 | 12,910 | 2,250 | 4,570 ms | 246 ms | 466 ms | $0.00051640 |
 
 All 48 calls completed without a rate-limit response. Cost uses the configured $0.04 per million input tokens and is explicitly an input-only estimate; output tokens are reported but not silently assigned a price. This benchmark proves typed transport capacity and account behavior, not ten simultaneous Minecraft task completions.
+
+## Live hidden-client gameplay
+
+Measured September 17, 2026 with `scripts/Test-HiddenTakeover.ps1 -LiveGateway` after paid account credit was enabled. A hidden real client connected to a dedicated loopback server and completed a two-step task using ordinary multiplayer mechanics. Jev selected a visible oak log in 677 ms and a valid placement support in 337 ms. The client mined and collected the resulting item entity, placed one cobblestone through the normal item-use path, released all synthetic keys, and waited for the dedicated server to independently confirm both block changes. The successful run used exactly two live decisions and had no 429 response. This is a narrow gameplay proof, not a general-task or multi-agent success benchmark.

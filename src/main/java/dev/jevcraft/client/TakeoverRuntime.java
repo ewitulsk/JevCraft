@@ -13,10 +13,15 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.phys.*;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -40,10 +45,14 @@ public final class TakeoverRuntime {
     private static long goalVersion;
     private static BlockPos target;
     private static BlockPos pickupTarget;
+    private static BlockPos placementSupport;
+    private static final Set<BlockPos> rejectedPlacements = new HashSet<>();
     private static int pickupUntilTick;
     private static CancellationToken inFlight;
     private static InferenceProvider provider;
     private static boolean hiddenTestStarted;
+    private static boolean hiddenPlacementStarted;
+    private static int hiddenPlacementCompleteTick = -1;
     private static boolean hiddenConnectStarted;
     private static int hiddenBootTicks;
     private static int nextRequestTick;
@@ -77,7 +86,17 @@ public final class TakeoverRuntime {
         }
         if (physicalOverride(minecraft)) { stop(minecraft, "Player reclaimed control"); return; }
         GoalParser.Goal parsed = new GoalParser().parse(goal);
-        if (parsed.kind() != GoalParser.Kind.ACQUIRE || !parsed.subject().contains("log")) {
+        if (parsed.kind() == GoalParser.Kind.BUILD) {
+            pickupTarget = null;
+            if (placementSupport == null) {
+                releaseKeys(minecraft); minecraft.gameMode.stopDestroyBlock();
+                if (provider == null) { status = "Missing provider credential"; return; }
+                if (findBlockSlot(minecraft.player, parsed.subject()) < 0) { stop(minecraft, "Requested block is not in the hotbar"); return; }
+                if (inFlight == null && minecraft.player.tickCount >= nextRequestTick && minecraft.player.tickCount % 10 == 0) requestPlacementTarget(minecraft, parsed);
+            } else executePlacement(minecraft, placementSupport, parsed);
+            hiddenTestLifecycle(minecraft); return;
+        }
+        if (parsed.kind() != GoalParser.Kind.ACQUIRE || !parsed.subject().toLowerCase(Locale.ROOT).contains("log")) {
             stop(minecraft, "Unsupported takeover goal"); return;
         }
         if (countLogs(minecraft.player) >= parsed.quantity()) { stop(minecraft, "Goal complete"); return; }
@@ -106,12 +125,23 @@ public final class TakeoverRuntime {
     private static void hiddenTestLifecycle(Minecraft minecraft) {
         if (!Boolean.getBoolean("jevcraft.hiddenClientTest") || minecraft.player == null || minecraft.level == null) return;
         if (!hiddenTestStarted && minecraft.player.tickCount > 40) { hiddenTestStarted=true; start("collect one oak log"); LOGGER.info("HIDDEN_TAKEOVER_CLIENT_START"); }
-        if (hiddenTestStarted && countLogs(minecraft.player) >= 1) {
-            stop(minecraft,"Goal complete");
-            boolean released = !minecraft.options.keyUp.isDown() && !minecraft.options.keyJump.isDown() && !minecraft.options.keyAttack.isDown() && !minecraft.options.keyUse.isDown();
-            if (!released) throw new IllegalStateException("takeover stop left a synthetic key held");
-            LOGGER.info("HIDDEN_TAKEOVER_CLIENT_PASS"); minecraft.stop();
-        } else if (hiddenTestStarted && minecraft.player.tickCount > 1200) {
+        if (hiddenTestStarted && !hiddenPlacementStarted && countLogs(minecraft.player) >= 1) {
+            hiddenPlacementStarted=true; hiddenPlacementCompleteTick=-1; start("place one cobblestone"); LOGGER.info("HIDDEN_TAKEOVER_PLACEMENT_START");
+        }
+        if (hiddenPlacementStarted && countItem(minecraft.player, net.minecraft.world.item.Items.COBBLESTONE) == 0) {
+            if (hiddenPlacementCompleteTick < 0) {
+                hiddenPlacementCompleteTick=minecraft.player.tickCount+20;
+                LOGGER.info("HIDDEN_TAKEOVER_AWAITING_SERVER_ACK");
+            } else if (minecraft.player.tickCount >= hiddenPlacementCompleteTick) {
+                stop(minecraft,"Goal complete");
+                boolean released = !minecraft.options.keyUp.isDown() && !minecraft.options.keyJump.isDown() && !minecraft.options.keyAttack.isDown() && !minecraft.options.keyUse.isDown();
+                if (!released) throw new IllegalStateException("takeover stop left a synthetic key held");
+                LOGGER.info("HIDDEN_TAKEOVER_CLIENT_PASS"); minecraft.stop();
+            }
+        } else if (hiddenPlacementStarted) {
+            hiddenPlacementCompleteTick=-1;
+        }
+        if (hiddenTestStarted && minecraft.player.tickCount > 1200) {
             throw new IllegalStateException("hidden takeover timed out: " + status);
         }
     }
@@ -126,7 +156,6 @@ public final class TakeoverRuntime {
         if (positions.isEmpty()) { status = "No visible logs"; return; }
         Map<String, Object> choices = new LinkedHashMap<>();
         positions.forEach((id, pos) -> choices.put(id, "Mine visible log at relative position " + relative(minecraft.player, pos)));
-        choices.put("wait", "Wait because no candidate is currently feasible");
         long version = goalVersion;
         InferenceRequest request = new InferenceRequest(UUID.randomUUID(), ACTOR, 1, minecraft.player.tickCount, version,
                 Map.of("goal", goal, "health", minecraft.player.getHealth(), "food", minecraft.player.getFoodData().getFoodLevel(),
@@ -153,6 +182,29 @@ public final class TakeoverRuntime {
             }
         }));
     }
+    private static void requestPlacementTarget(Minecraft minecraft, GoalParser.Goal parsed) {
+        Map<String, BlockPos> positions = visibleSupports(minecraft, 6, 24);
+        if (positions.isEmpty()) { status = "No visible placement surface"; return; }
+        Map<String, Object> choices = new LinkedHashMap<>();
+        positions.forEach((id, pos) -> choices.put(id, "Place the requested block on the top face at relative position " + relative(minecraft.player, pos)));
+        long version = goalVersion;
+        InferenceRequest request = new InferenceRequest(UUID.randomUUID(), ACTOR, 1, minecraft.player.tickCount, version,
+                Map.of("goal", goal, "health", minecraft.player.getHealth(), "food", minecraft.player.getFoodData().getFoodLevel(), "requestedBlock", parsed.subject()),
+                Map.of("action", new Question.Choice("Choose one visible support face for placing the requested block.", choices)), Instant.now().plusSeconds(3));
+        CancellationToken token = new CancellationToken(); inFlight = token; status = "Asking Jev";
+        provider.evaluate(request, token).orTimeout(5, TimeUnit.SECONDS).whenComplete((response, failure) -> minecraft.execute(() -> {
+            if (inFlight != token) return; inFlight = null;
+            if (!active || goalVersion != version || minecraft.level == null) return;
+            if (failure != null) { nextRequestTick=minecraft.player.tickCount+100; status="Decision unavailable; retrying later"; return; }
+            Answer answer=response.answers().get("action");
+            if (answer instanceof Answer.Choice choice) {
+                LOGGER.info("TAKEOVER_DECISION provider={} model={} latencyMs={} choice={}",response.provider(),response.model(),response.latency().toMillis(),choice.choice());
+                BlockPos selected=positions.get(choice.choice());
+                if(selected!=null&&canPlaceAbove(minecraft,selected)&&canSee(minecraft,selected)){placementSupport=selected;status="Placing at "+relative(minecraft.player,selected);}
+                else{nextRequestTick=minecraft.player.tickCount+20;status="Jev chose to wait";}
+            }
+        }));
+    }
     private static Map<String, BlockPos> visibleLogs(Minecraft minecraft, int radius, int limit) {
         Map<String, BlockPos> found = new LinkedHashMap<>(); BlockPos center = minecraft.player.blockPosition();
         for (BlockPos cursor : BlockPos.betweenClosed(center.offset(-radius, -3, -radius), center.offset(radius, radius, radius))) {
@@ -160,6 +212,17 @@ public final class TakeoverRuntime {
             if (minecraft.level.getBlockState(pos).is(BlockTags.LOGS) && canSee(minecraft, pos)) found.put("mine_" + found.size(), pos);
         }
         return found;
+    }
+    private static Map<String, BlockPos> visibleSupports(Minecraft minecraft,int radius,int limit){
+        Map<String,BlockPos> found=new LinkedHashMap<>();BlockPos center=minecraft.player.blockPosition();
+        for(BlockPos cursor:BlockPos.betweenClosed(center.offset(-radius,-2,-radius),center.offset(radius,2,radius))){if(found.size()>=limit)break;BlockPos pos=cursor.immutable();
+            if(canPlaceAbove(minecraft,pos)&&canSee(minecraft,pos))found.put("place_"+found.size(),pos);}
+        return found;
+    }
+    private static boolean canPlaceAbove(Minecraft minecraft,BlockPos support){
+        BlockPos placed=support.above();
+        return !rejectedPlacements.contains(support)&&minecraft.level.getBlockState(support).isFaceSturdy(minecraft.level,support,Direction.UP)
+                &&minecraft.level.getBlockState(placed).canBeReplaced()&&!new AABB(placed).intersects(minecraft.player.getBoundingBox());
     }
     private static boolean canSee(Minecraft minecraft, BlockPos pos) {
         BlockHitResult hit = minecraft.level.clip(new ClipContext(minecraft.player.getEyePosition(), Vec3.atCenterOf(pos), ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, minecraft.player));
@@ -180,10 +243,21 @@ public final class TakeoverRuntime {
         Direction face = hit.getType() == HitResult.Type.BLOCK ? hit.getDirection() : Direction.UP;
         minecraft.options.keyAttack.setDown(true); minecraft.gameMode.continueDestroyBlock(pos, face); player.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
     }
+    private static void executePlacement(Minecraft minecraft,BlockPos support,GoalParser.Goal parsed){
+        LocalPlayer player=minecraft.player;Vec3 aim=new Vec3(support.getX()+.5,support.getY()+1.0,support.getZ()+.5);Vec3 delta=aim.subtract(player.getEyePosition());double horizontal=Math.sqrt(delta.x*delta.x+delta.z*delta.z);
+        player.setYRot((float)(Mth.atan2(delta.z,delta.x)*180/Math.PI)-90);player.setXRot((float)-(Mth.atan2(delta.y,horizontal)*180/Math.PI));
+        if(player.distanceToSqr(aim)>20.25){minecraft.options.keyUp.setDown(true);minecraft.options.keyJump.setDown(player.horizontalCollision);status="Approaching placement surface";return;}
+        minecraft.options.keyUp.setDown(false);minecraft.options.keyJump.setDown(false);int slot=findBlockSlot(player,parsed.subject());if(slot<0){stop(minecraft,"Requested block is not in the hotbar");return;}player.getInventory().selected=slot;
+        BlockHitResult hit=new BlockHitResult(aim,Direction.UP,support,false);InteractionResult result=minecraft.gameMode.useItemOn(player,InteractionHand.MAIN_HAND,hit);player.swing(InteractionHand.MAIN_HAND);
+        if(result.consumesAction()&&!minecraft.level.getBlockState(support.above()).isAir()){LOGGER.info("TAKEOVER_PLACEMENT_PASS pos={}",support.above());placementSupport=null;stop(minecraft,"Goal complete");}else{rejectedPlacements.add(support);placementSupport=null;nextRequestTick=player.tickCount+20;status="Placement was rejected";}
+    }
     private static void approachDrop(Minecraft minecraft,BlockPos pos){
-        LocalPlayer player=minecraft.player; Vec3 center=Vec3.atCenterOf(pos); Vec3 delta=center.subtract(player.position());
+        LocalPlayer player=minecraft.player;
+        Vec3 destination=minecraft.level.getEntitiesOfClass(ItemEntity.class,player.getBoundingBox().inflate(10),item->item.getItem().is(ItemTags.LOGS)).stream()
+                .min(Comparator.comparingDouble(player::distanceToSqr)).map(ItemEntity::position).orElse(Vec3.atCenterOf(pos));
+        Vec3 delta=destination.subtract(player.position());
         player.setYRot((float)(Mth.atan2(delta.z,delta.x)*180/Math.PI)-90); minecraft.gameMode.stopDestroyBlock(); minecraft.options.keyAttack.setDown(false);
-        boolean move=player.distanceToSqr(center)>1.0; minecraft.options.keyUp.setDown(move); minecraft.options.keyJump.setDown(move&&player.horizontalCollision); status="Collecting drop";
+        boolean move=player.distanceToSqr(destination)>0.35; minecraft.options.keyUp.setDown(move); minecraft.options.keyJump.setDown(move&&player.horizontalCollision); status="Collecting drop";
     }
     private static void selectBestHotbarTool(LocalPlayer player, net.minecraft.world.level.block.state.BlockState state) {
         int best = player.getInventory().selected; float speed = player.getInventory().getItem(best).getDestroySpeed(state);
@@ -191,10 +265,12 @@ public final class TakeoverRuntime {
         player.getInventory().selected = best;
     }
     private static int countLogs(LocalPlayer player) { return player.getInventory().items.stream().filter(s -> s.is(ItemTags.LOGS)).mapToInt(net.minecraft.world.item.ItemStack::getCount).sum(); }
+    private static int countItem(LocalPlayer player,net.minecraft.world.item.Item item){return player.getInventory().items.stream().filter(s->s.is(item)).mapToInt(net.minecraft.world.item.ItemStack::getCount).sum();}
+    private static int findBlockSlot(LocalPlayer player,String subject){String requested=subject.toLowerCase(Locale.ROOT);for(int i=0;i<9;i++){var stack=player.getInventory().getItem(i);if(stack.getItem() instanceof BlockItem){String id=BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath().replace('_',' ');if(requested.contains(id)||requested.contains(stack.getHoverName().getString().toLowerCase(Locale.ROOT)))return i;}}return -1;}
     private static String relative(LocalPlayer player, BlockPos pos) { return (pos.getX()-player.getBlockX())+","+(pos.getY()-player.getBlockY())+","+(pos.getZ()-player.getBlockZ()); }
     public static void start(String instruction) { Minecraft minecraft = Minecraft.getInstance(); stop(minecraft, "Goal replaced"); goal = instruction.strip(); active = !goal.isBlank(); goalVersion++; status = active ? "Preparing" : "Stopped"; }
     public static void stop(Minecraft minecraft, String reason) {
-        active = false; target = null; pickupTarget=null; goalVersion++; status = reason;
+        active = false; target = null; pickupTarget=null; placementSupport=null; rejectedPlacements.clear(); goalVersion++; status = reason;
         if (inFlight != null) { inFlight.cancel(); inFlight = null; }
         if (minecraft.gameMode != null) minecraft.gameMode.stopDestroyBlock(); releaseKeys(minecraft);
     }

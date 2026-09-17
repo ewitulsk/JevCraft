@@ -93,7 +93,7 @@ public final class JevCraft {
                 var level=player.serverLevel();
                 for(int x=-3;x<=4;x++) for(int z=-3;z<=3;z++) level.setBlockAndUpdate(new BlockPos(x,1,z),Blocks.STONE.defaultBlockState());
                 level.setBlockAndUpdate(new BlockPos(3,2,0),Blocks.OAK_LOG.defaultBlockState());
-                player.teleportTo(level,.5,2,.5,Set.of(),0,0); player.getInventory().add(new ItemStack(Items.WOODEN_AXE));
+                player.teleportTo(level,.5,2,.5,Set.of(),0,0); player.getInventory().add(new ItemStack(Items.WOODEN_AXE)); player.getInventory().add(new ItemStack(Items.COBBLESTONE));
                 LOGGER.info("HIDDEN_TAKEOVER_SERVER_READY");
             } else deliverStarterEgg(player);
         }
@@ -105,7 +105,8 @@ public final class JevCraft {
     private void playerTick(PlayerTickEvent.Post event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             if (Boolean.getBoolean("jevcraft.hiddenClientTest")) {
-                if (!hiddenServerPassed && player.serverLevel().getBlockState(new BlockPos(3,2,0)).isAir()) { hiddenServerPassed=true; LOGGER.info("HIDDEN_TAKEOVER_SERVER_PASS"); }
+                boolean placed=false; for(int x=-6;x<=6&&!placed;x++)for(int y=0;y<=5&&!placed;y++)for(int z=-6;z<=6;z++)if(player.serverLevel().getBlockState(new BlockPos(x,y,z)).is(Blocks.COBBLESTONE)){placed=true;break;}
+                if (!hiddenServerPassed && player.serverLevel().getBlockState(new BlockPos(3,2,0)).isAir() && placed) { hiddenServerPassed=true; LOGGER.info("HIDDEN_TAKEOVER_SERVER_PASS"); }
             } else if (player.tickCount % 20 == 0) deliverStarterEgg(player);
         }
     }

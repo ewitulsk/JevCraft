@@ -17,7 +17,7 @@ Requires Java 21. On Windows:
 
 `build/libs/jevcraft-full-*.jar` is the full client/server mod. `jevcraft-client-*.jar` is the client-only takeover edition.
 
-Both editions include the same takeover controller: press F8 for the non-pausing instruction overlay and F9 for immediate stop. The initial verified takeover goal is “collect one/four oak logs”; it uses Jev to select a visible target and ordinary client movement, mining, and pickup paths.
+Both editions include the same takeover controller: press F8 for the non-pausing instruction overlay and F9 for immediate stop. The verified takeover goals include collecting oak logs and placing a requested hotbar block; they use Jev to select visible targets or support faces and ordinary client movement, mining, pickup, and item-use paths.
 
 See `docs/CAPABILITY_MATRIX.md`, `docs/VERIFICATION.md`, and `docs/BENCHMARKS.md` for the difference between implemented mechanics, deterministic verification, live Jev gameplay evidence, and performance measurements.
 
