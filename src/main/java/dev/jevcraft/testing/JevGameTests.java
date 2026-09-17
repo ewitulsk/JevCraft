@@ -342,6 +342,13 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionWeavesBannerThroughLoomMenu(GameTestHelper helper) {
+        BlockPos loomPos=new BlockPos(3,1,2);helper.setBlock(loomPos,Blocks.LOOM);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.WHITE_BANNER));entity.inventory().setItem(1,new ItemStack(Items.RED_DYE));BlockPos absolute=helper.absolutePos(loomPos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().weaveBanner(helper.getLevel(),hit,0,1,0),"loom menu transaction failed");int dye=0,patterned=0;for(int i=0;i<entity.inventory().getContainerSize();i++){ItemStack stack=entity.inventory().getItem(i);if(stack.is(Items.RED_DYE))dye+=stack.getCount();var layers=stack.get(net.minecraft.core.component.DataComponents.BANNER_PATTERNS);if(stack.is(Items.WHITE_BANNER)&&layers!=null&&!layers.layers().isEmpty())patterned+=stack.getCount();}
+        helper.assertValueEqual(dye,0,"loom did not consume exactly one dye");helper.assertValueEqual(patterned,1,"loom did not return one patterned banner");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));

@@ -96,6 +96,9 @@ public final class CompanionActionExecutor {
     public boolean grind(ServerLevel level,BlockHitResult hit,int inputSlot,int additionalSlot){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.grind(level,hit,inputSlot,additionalSlot);
     }
+    public boolean weaveBanner(ServerLevel level,BlockHitResult hit,int bannerSlot,int dyeSlot,int patternIndex){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.weaveBanner(level,hit,bannerSlot,dyeSlot,patternIndex);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);

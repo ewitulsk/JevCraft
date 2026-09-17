@@ -19,6 +19,7 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
 import net.minecraft.world.inventory.GrindstoneMenu;
 import net.minecraft.world.inventory.MerchantMenu;
+import net.minecraft.world.inventory.LoomMenu;
 import net.minecraft.world.inventory.SmokerMenu;
 import net.minecraft.world.inventory.StonecutterMenu;
 import net.minecraft.world.inventory.SimpleContainerData;
@@ -260,6 +261,18 @@ public final class CompanionInteractionContext {
         menu.clicked(firstMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(firstMenu,0,ClickType.PICKUP,actor);menu.clicked(secondMenu,0,ClickType.PICKUP,actor);menu.clicked(1,1,ClickType.PICKUP,actor);menu.clicked(secondMenu,0,ClickType.PICKUP,actor);
         if(!menu.getSlot(2).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(2).getItem().copy();menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean exact=countItemType(companion.inventory(),first.getItem())==before-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
+    }
+
+    /** Applies one selectable banner pattern through the real loom input, selection, and result callbacks. */
+    public boolean weaveBanner(ServerLevel level,BlockHitResult hit,int bannerSlot,int dyeSlot,int patternIndex){
+        if(bannerSlot<0||dyeSlot<0||bannerSlot==dyeSlot||bannerSlot>=companion.inventory().getContainerSize()||dyeSlot>=companion.inventory().getContainerSize())return false;
+        ItemStack banner=companion.inventory().getItem(bannerSlot).copy(),dye=companion.inventory().getItem(dyeSlot).copy();if(banner.isEmpty()||dye.isEmpty())return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int destination=emptySlot();if(destination<0){clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);if(!access.consumesAction()){clearPlayer(actor);return false;}
+        LoomMenu menu=new LoomMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int bannerMenu=playerMenuSlot(menu,actor,bannerSlot),dyeMenu=playerMenuSlot(menu,actor,dyeSlot),destinationMenu=playerMenuSlot(menu,actor,destination);int bannerBefore=countItem(actor.getInventory(),banner),dyeBefore=countItem(actor.getInventory(),dye);
+        if(bannerMenu<0||dyeMenu<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(bannerMenu,0,ClickType.PICKUP,actor);menu.clicked(menu.slots.indexOf(menu.getBannerSlot()),1,ClickType.PICKUP,actor);menu.clicked(bannerMenu,0,ClickType.PICKUP,actor);menu.clicked(dyeMenu,0,ClickType.PICKUP,actor);menu.clicked(menu.slots.indexOf(menu.getDyeSlot()),1,ClickType.PICKUP,actor);menu.clicked(dyeMenu,0,ClickType.PICKUP,actor);
+        if(patternIndex<0||patternIndex>=menu.getSelectablePatterns().size()||!menu.clickMenuButton(actor,patternIndex)||!menu.getResultSlot().hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getResultSlot().getItem().copy();menu.clicked(menu.slots.indexOf(menu.getResultSlot()),0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
+        boolean exact=countItem(companion.inventory(),banner)==bannerBefore-1&&countItem(companion.inventory(),dye)==dyeBefore-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
