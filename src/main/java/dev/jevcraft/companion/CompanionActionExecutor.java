@@ -23,6 +23,10 @@ public final class CompanionActionExecutor {
     private float miningProgress;
     private LivingEntity rangedTarget;
     private int bowSlot=-1,ammoSlot=-1,rangedTicks;
+    private Vec3 movementTarget;
+    private double movementSpeed;
+    private int movementTicks;
+    private String lastFailure="";
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
 
@@ -30,14 +34,18 @@ public final class CompanionActionExecutor {
         this.companion = companion; this.interactions = new CompanionInteractionContext(companion);
     }
     public void beginMine(BlockPos target, long goalVersion) {
-        miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;
+        miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;
     }
     public void beginRangedAttack(LivingEntity target,int bowSlot,int ammoSlot,long goalVersion){
-        rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;
+        rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;
     }
-    public void cancel() { miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0; companion.getNavigation().stop(); }
+    public void beginMove(Vec3 target,double speed,long goalVersion){
+        movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;companion.getNavigation().stop();
+    }
+    public void cancel() { miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0; companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
+    public String lastFailure(){return lastFailure;}
     public float miningProgress() { return miningProgress; }
     public InteractionResult place(ServerLevel level, BlockHitResult hit, int inventorySlot) {
         return useBlock(level,hit,inventorySlot);
@@ -100,7 +108,8 @@ public final class CompanionActionExecutor {
 
     public Result tick(ServerLevel level) {
         if(rangedTarget!=null) return tickRanged(level);
-        if (miningTarget == null) return lastResult = Result.IDLE;
+        if(movementTarget!=null)return tickMove();
+        if (miningTarget == null) return Result.IDLE;
         if (actionGoalVersion != companion.goalVersion()) { cancel(); return lastResult = Result.INVALID; }
         BlockState state = level.getBlockState(miningTarget);
         if (state.isAir() || state.getDestroySpeed(level, miningTarget) < 0) { cancel(); return lastResult = Result.INVALID; }
@@ -123,6 +132,13 @@ public final class CompanionActionExecutor {
         level.destroyBlockProgress(companion.getId(), miningTarget, -1);
         miningTarget = null; miningProgress = 0;
         return lastResult = success ? Result.SUCCEEDED : Result.INVALID;
+    }
+    private Result tickMove(){
+        if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}
+        if(++movementTicks>400){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}
+        if(companion.distanceToSqr(movementTarget)<=2.25){companion.getNavigation().stop();movementTarget=null;movementTicks=0;return lastResult=Result.SUCCEEDED;}
+        if(companion.getNavigation().isDone()||movementTicks%10==1)if(!companion.getNavigation().moveTo(movementTarget.x,movementTarget.y,movementTarget.z,movementSpeed)){lastFailure="no_path";cancel();return lastResult=Result.INVALID;}
+        companion.getLookControl().setLookAt(movementTarget);return lastResult=Result.MOVING;
     }
     private Result tickRanged(ServerLevel level){
         if(actionGoalVersion!=companion.goalVersion()||!rangedTarget.isAlive()||rangedTarget.level()!=level||bowSlot<0||bowSlot>=companion.inventory().getContainerSize()||ammoSlot<0||ammoSlot>=companion.inventory().getContainerSize()){

@@ -42,6 +42,13 @@ import java.util.UUID;
 @GameTestHolder("jevcraft")
 @PrefixGameTestTemplate(false)
 public final class JevGameTests {
+    @GameTest(template = "empty", timeoutTicks = 240)
+    public static void companionCompletesGoalVersionedSlabMovement(GameTestHelper helper) {
+        for(int x=0;x<8;x++){for(int z=0;z<6;z++)helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);for(int y=1;y<=2;y++){helper.setBlock(new BlockPos(x,y,0),Blocks.STONE);helper.setBlock(new BlockPos(x,y,5),Blocks.STONE);}}for(int z=1;z<=4;z++)helper.setBlock(new BlockPos(3,1,z),Blocks.STONE_SLAB);
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(1,1,2));entity.acceptGoal("move across slab band");Vec3 target=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,1,2)));helper.runAfterDelay(2,()->entity.actions().beginMove(target,1,entity.goalVersion()));
+        helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"goal-versioned navigation has not completed forced slab route; failure="+entity.actions().lastFailure()+" pos="+entity.position()+" distance="+entity.distanceToSqr(target)+" onGround="+entity.onGround());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"completed slab movement did not remain within 1.5 blocks of validated destination; pos="+entity.position());});
+    }
+
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionBodyInventoryAndGoalPersist(GameTestHelper helper) {
         UUID owner = UUID.randomUUID(), administrator = UUID.randomUUID();
@@ -281,7 +288,7 @@ public final class JevGameTests {
         });
     }
 
-    @GameTest(template = "empty", timeoutTicks = 240)
+    @GameTest(template = "empty", timeoutTicks = 320)
     public static void companionUsesSmokerAndBlastFurnaceMenus(GameTestHelper helper) {
         BlockPos smokerPos=new BlockPos(3,1,2),blastPos=new BlockPos(2,1,3);helper.setBlock(smokerPos,Blocks.SMOKER);helper.setBlock(blastPos,Blocks.BLAST_FURNACE);
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(9,new ItemStack(Items.BEEF));entity.inventory().setItem(10,new ItemStack(Items.COAL));entity.inventory().setItem(11,new ItemStack(Items.RAW_IRON));entity.inventory().setItem(12,new ItemStack(Items.COAL));

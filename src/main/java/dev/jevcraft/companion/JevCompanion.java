@@ -13,6 +13,7 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.navigation.GroundPathNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -47,10 +48,14 @@ public final class JevCompanion extends PathfinderMob {
     private final CompanionActionExecutor actions = new CompanionActionExecutor(this);
     private final Deque<ChatObservation> recentChat = new ArrayDeque<>();
 
-    public JevCompanion(EntityType<? extends PathfinderMob> type, Level level) { super(type, level); setPersistenceRequired(); setCanPickUpLoot(true); }
+    public JevCompanion(EntityType<? extends PathfinderMob> type, Level level) {
+        super(type, level);setPersistenceRequired();setCanPickUpLoot(true);getNavigation().setCanFloat(true);
+        if(getNavigation() instanceof GroundPathNavigation ground){ground.setCanOpenDoors(true);ground.setCanPassDoors(true);}
+    }
     @Override protected void registerGoals() {
         goalSelector.addGoal(0, new FloatGoal(this));
-        goalSelector.addGoal(5, new RandomStrollGoal(this, .8));
+        goalSelector.addGoal(1,new OpenDoorGoal(this,true));
+        goalSelector.addGoal(5,new RandomStrollGoal(this,.8){@Override public boolean canUse(){return currentGoal.isBlank()&&super.canUse();}});
         goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8));
         goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
