@@ -30,6 +30,9 @@ import net.minecraft.core.BlockPos;
 import java.util.*;
 
 public final class JevCompanion extends PathfinderMob {
+    private static final EntityDimensions STANDING_DIMENSIONS=EntityDimensions.scalable(.6F,1.8F).withEyeHeight(1.62F);
+    private static final EntityDimensions CROUCHING_DIMENSIONS=EntityDimensions.scalable(.6F,1.5F).withEyeHeight(1.27F);
+    private static final EntityDimensions CRAWLING_DIMENSIONS=EntityDimensions.scalable(.6F,.6F).withEyeHeight(.4F);
     public record ChatObservation(UUID sender, String text, boolean authorized, boolean privateMessage) {}
     private static final int CHAT_LIMIT = 32;
     private final SimpleContainer inventory = new SimpleContainer(36);
@@ -54,6 +57,7 @@ public final class JevCompanion extends PathfinderMob {
         super(type, level);setPersistenceRequired();setCanPickUpLoot(true);getNavigation().setCanFloat(true);
         if(getNavigation() instanceof GroundPathNavigation ground){ground.setCanOpenDoors(true);ground.setCanPassDoors(true);}
     }
+    @Override protected EntityDimensions getDefaultDimensions(Pose pose){return switch(pose){case CROUCHING->CROUCHING_DIMENSIONS;case SWIMMING,FALL_FLYING,SPIN_ATTACK->CRAWLING_DIMENSIONS;default->STANDING_DIMENSIONS;};}
     @Override protected void registerGoals() {
         goalSelector.addGoal(0, new FloatGoal(this));
         goalSelector.addGoal(1,new OpenDoorGoal(this,true));

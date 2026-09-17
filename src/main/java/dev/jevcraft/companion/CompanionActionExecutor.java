@@ -15,6 +15,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ArrowItem;
 import net.minecraft.world.item.BowItem;
@@ -47,6 +48,11 @@ public final class CompanionActionExecutor {
     private int tridentSlot=-1,tridentTicks;
     private Vec3 flightTarget;
     private int flightTicks;
+    private float groundForward,groundStrafe,groundYaw;
+    private int groundControlTicks,groundControlDuration;
+    private boolean groundSprint,groundCrouch,groundJump;
+    private Vec3 crawlTarget;
+    private int crawlTicks;
     private String lastFailure="";
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
@@ -68,7 +74,9 @@ public final class CompanionActionExecutor {
     public void beginCrossbowAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();stopFlight();crossbowTarget=Objects.requireNonNull(target);crossbowSlot=weaponSlot;crossbowTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
     public void beginTridentAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();stopFlight();tridentTarget=Objects.requireNonNull(target);tridentSlot=weaponSlot;tridentTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
     public boolean beginCreativeFlight(Vec3 target,long goalVersion){if(!companion.creativeMode()||target==null||!Double.isFinite(target.x)||!Double.isFinite(target.y)||!Double.isFinite(target.z))return false;restoreChargedWeapons();flightTarget=target;flightTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();companion.setNoGravity(true);return true;}
-    public void cancel() { restoreChargedWeapons();stopFlight();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
+    public boolean beginGroundControl(float forward,float strafe,float yaw,boolean sprint,boolean crouch,boolean jump,int ticks,long goalVersion){if(!Float.isFinite(forward)||!Float.isFinite(strafe)||!Float.isFinite(yaw)||ticks<1||ticks>200)return false;Pose requested=crouch?Pose.CROUCHING:Pose.STANDING;if(!companion.level().noCollision(companion,companion.getDimensions(requested).makeBoundingBox(companion.position())))return false;restoreChargedWeapons();stopFlight();clearStance();groundForward=Mth.clamp(forward,-1,1);groundStrafe=Mth.clamp(strafe,-1,1);groundYaw=yaw;groundSprint=sprint&&!crouch;groundCrouch=crouch;groundJump=jump;groundControlTicks=0;groundControlDuration=ticks;actionGoalVersion=goalVersion;lastFailure="";miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;crawlTarget=null;companion.getNavigation().stop();return true;}
+    public boolean beginCrawl(Vec3 target,long goalVersion){if(target==null||!Double.isFinite(target.x)||!Double.isFinite(target.y)||!Double.isFinite(target.z))return false;restoreChargedWeapons();stopFlight();clearStance();crawlTarget=target;crawlTicks=0;actionGoalVersion=goalVersion;lastFailure="";miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;groundControlDuration=0;companion.getNavigation().stop();return true;}
+    public void cancel() { restoreChargedWeapons();stopFlight();clearStance();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;groundControlDuration=0;groundControlTicks=0;crawlTarget=null;crawlTicks=0;Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public String lastFailure(){return lastFailure;}
@@ -189,6 +197,8 @@ public final class CompanionActionExecutor {
 
     public Result tick(ServerLevel level) {
         if(flightTarget!=null)return tickFlight();
+        if(crawlTarget!=null)return tickCrawl();
+        if(groundControlDuration>0)return tickGroundControl();
         if(tridentTarget!=null)return tickTrident(level);
         if(crossbowTarget!=null)return tickCrossbow(level);
         if(rangedTarget!=null) return tickRanged(level);
@@ -240,6 +250,13 @@ public final class CompanionActionExecutor {
         if(actionGoalVersion!=companion.goalVersion()||!companion.creativeMode()){lastFailure=companion.creativeMode()?"stale_goal":"creative_revoked";stopFlight();return lastResult=Result.INVALID;}if(++flightTicks>400){lastFailure="timeout";stopFlight();return lastResult=Result.INVALID;}Vec3 delta=flightTarget.subtract(companion.position());double distance=delta.length();if(distance*distance<=2.25){companion.setDeltaMovement(delta.scale(.08));return lastResult=Result.SUCCEEDED;}companion.setDeltaMovement(delta.normalize().scale(Math.min(.28,distance*.12)));companion.fallDistance=0;companion.getLookControl().setLookAt(flightTarget);return lastResult=Result.MOVING;
     }
     private void stopFlight(){if(flightTarget!=null||companion.isNoGravity()){flightTarget=null;flightTicks=0;companion.setNoGravity(false);}}
+    private Result tickGroundControl(){
+        if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}if(groundControlTicks++>=groundControlDuration){groundControlDuration=0;clearStance();companion.setDeltaMovement(0,companion.getDeltaMovement().y,0);return lastResult=Result.SUCCEEDED;}Pose requested=groundCrouch?Pose.CROUCHING:Pose.STANDING;if(!companion.level().noCollision(companion,companion.getDimensions(requested).makeBoundingBox(companion.position()))){lastFailure="blocked_pose";cancel();return lastResult=Result.INVALID;}companion.setYRot(groundYaw);companion.setYHeadRot(groundYaw);companion.setSprinting(groundSprint);companion.setShiftKeyDown(groundCrouch);companion.setPose(requested);if(groundJump&&companion.onGround()){companion.getJumpControl().jump();groundJump=false;}double radians=Math.toRadians(groundYaw),forwardX=-Math.sin(radians),forwardZ=Math.cos(radians),rightX=Math.cos(radians),rightZ=Math.sin(radians),length=Math.max(1,Math.sqrt(groundForward*groundForward+groundStrafe*groundStrafe)),speed=(groundSprint?.16:.12)*(groundCrouch?.3:1);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement((forwardX*groundForward+rightX*groundStrafe)/length*speed,velocity.y,(forwardZ*groundForward+rightZ*groundStrafe)/length*speed);return lastResult=Result.MOVING;
+    }
+    private Result tickCrawl(){
+        if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}if(++crawlTicks>400){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}companion.setSprinting(false);companion.setShiftKeyDown(false);companion.setSwimming(true);companion.setPose(Pose.SWIMMING);Vec3 delta=crawlTarget.subtract(companion.position()),horizontal=new Vec3(delta.x,0,delta.z);if(horizontal.lengthSqr()<=.49){crawlTarget=null;crawlTicks=0;companion.setDeltaMovement(0,companion.getDeltaMovement().y,0);clearStance();return lastResult=Result.SUCCEEDED;}Vec3 direction=horizontal.normalize();companion.setDeltaMovement(direction.x*.12,companion.getDeltaMovement().y,direction.z*.12);companion.getLookControl().setLookAt(crawlTarget);return lastResult=Result.MOVING;
+    }
+    private void clearStance(){companion.setSprinting(false);companion.setShiftKeyDown(false);companion.setSwimming(false);if(companion.level().noCollision(companion,companion.getDimensions(Pose.STANDING).makeBoundingBox(companion.position())))companion.setPose(Pose.STANDING);}
     private void openNearbyFenceGates(ServerLevel level){
         BlockPos center=companion.blockPosition();
         for(BlockPos candidate:BlockPos.betweenClosed(center.offset(-2,-1,-2),center.offset(2,1,2))){
