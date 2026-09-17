@@ -1,0 +1,14 @@
+.gradle/
+build/
+out/
+runs/
+*.log
+.idea/
+*.iml
+.vscode/
+.env
+.env.*
+!.env.example
+config/jevcraft*.toml
+secrets/
+artifacts/live/

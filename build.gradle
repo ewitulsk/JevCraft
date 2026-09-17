@@ -1,0 +1,89 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.140'
+}
+
+group = 'dev.jevcraft'
+version = mod_version
+base.archivesName = 'jevcraft-full'
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories { mavenCentral() }
+
+neoForge {
+    version = neoforge_version
+    runs {
+        client { client(); gameDirectory = file('runs/client'); jvmArgument '-Xmx3G' }
+        server { server(); gameDirectory = file('runs/server'); programArgument '--nogui'; jvmArgument '-Xmx2G' }
+        gameTestServer {
+            type = 'gameTestServer'
+            gameDirectory = file('runs/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'jevcraft'
+            programArgument '--nogui'
+            jvmArgument '-Xmx2G'
+        }
+    }
+    mods { jevcraft { sourceSet sourceSets.main } }
+}
+
+sourceSets {
+    clientOnly {
+        compileClasspath += sourceSets.main.output + configurations.compileClasspath
+        runtimeClasspath += output + compileClasspath
+    }
+}
+
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('test') { useJUnitPlatform() }
+tasks.named('processResources') {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
+}
+
+def testTemplates = layout.buildDirectory.dir('generated/testTemplates')
+tasks.register('generateTestTemplates') {
+    outputs.dir(testTemplates)
+    doLast {
+        def target = testTemplates.get().file('data/jevcraft/structure/empty.nbt').asFile
+        target.parentFile.mkdirs()
+        new DataOutputStream(new java.util.zip.GZIPOutputStream(new FileOutputStream(target))).withCloseable { out ->
+            out.writeByte(10); out.writeUTF('')
+            out.writeByte(3); out.writeUTF('DataVersion'); out.writeInt(3955)
+            out.writeByte(9); out.writeUTF('size'); out.writeByte(3); out.writeInt(3)
+            3.times { out.writeInt(8) }
+            out.writeByte(9); out.writeUTF('palette'); out.writeByte(10); out.writeInt(1)
+            out.writeByte(8); out.writeUTF('Name'); out.writeUTF('minecraft:air'); out.writeByte(0)
+            ['blocks', 'entities'].each { name -> out.writeByte(9); out.writeUTF(name); out.writeByte(10); out.writeInt(0) }
+            out.writeByte(0)
+        }
+    }
+}
+sourceSets.main.resources.srcDir(testTemplates)
+tasks.named('processResources') { dependsOn 'generateTestTemplates' }
+
+tasks.register('clientOnlyJar', Jar) {
+    archiveBaseName = 'jevcraft-client'
+    dependsOn tasks.named('clientOnlyClasses')
+    from(sourceSets.main.output) {
+        include 'dev/jevcraft/core/**'
+        include 'dev/jevcraft/inference/**'
+    }
+    from sourceSets.clientOnly.output
+    filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
+    manifest { attributes 'Implementation-Version': project.version }
+}
+
+tasks.named('assemble') { dependsOn 'clientOnlyJar' }
+
+tasks.register('liveGatewaySmoke', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.jevcraft.inference.LiveGatewaySmoke'
+}

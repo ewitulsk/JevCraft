@@ -1,0 +1,23 @@
+package dev.jevcraft.companion;
+
+import dev.jevcraft.JevCraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
+import net.neoforged.neoforge.common.world.chunk.TicketController;
+
+public final class MovingChunkTickets {
+    private static final TicketController CONTROLLER = new TicketController(ResourceLocation.fromNamespaceAndPath(JevCraft.MOD_ID, "companions"));
+    private MovingChunkTickets() {}
+    public static void register(RegisterTicketControllersEvent event) { event.register(CONTROLLER); }
+    public static void move(ServerLevel level, JevCompanion owner, int oldX, int oldZ, int newX, int newZ, int radius) {
+        for (int x = newX - radius; x <= newX + radius; x++) for (int z = newZ - radius; z <= newZ + radius; z++)
+            if (oldX == Integer.MIN_VALUE || Math.abs(x - oldX) > radius || Math.abs(z - oldZ) > radius) CONTROLLER.forceChunk(level, owner, x, z, true, true);
+        if (oldX != Integer.MIN_VALUE) for (int x = oldX - radius; x <= oldX + radius; x++) for (int z = oldZ - radius; z <= oldZ + radius; z++)
+            if (Math.abs(x - newX) > radius || Math.abs(z - newZ) > radius) CONTROLLER.forceChunk(level, owner, x, z, false, true);
+    }
+    public static void release(ServerLevel level, JevCompanion owner, int xCenter, int zCenter, int radius) {
+        for (int x = xCenter - radius; x <= xCenter + radius; x++) for (int z = zCenter - radius; z <= zCenter + radius; z++)
+            CONTROLLER.forceChunk(level, owner, x, z, false, true);
+    }
+}

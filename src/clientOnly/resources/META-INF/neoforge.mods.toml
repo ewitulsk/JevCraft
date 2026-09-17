@@ -1,0 +1,16 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="jevcraft_client"
+version="${version}"
+displayName="JevCraft Client"
+description='''Client-only Jev takeover for compatible unmodified servers.'''
+
+[[dependencies.jevcraft_client]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1]"
+ordering="NONE"
+side="CLIENT"
