@@ -6,10 +6,10 @@ Measured September 17, 2026 with `scripts/Test-AgentScaling.ps1` on Windows 11, 
 
 | Jevs | Exact ticking tickets | Minimum entity ticks | Paced wall ms/tick | Minecraft processing ms/tick |
 |---:|---:|---:|---:|---:|
-| 0 | 0 | 0 | 49.875 | 0.110 |
-| 1 | 25 | 399 | 49.880 | 0.316 |
-| 5 | 125 | 399 | 49.878 | 0.665 |
-| 10 | 250 | 399 | 49.880 | 0.749 |
+| 0 | 0 | 0 | 49.878 | 0.124 |
+| 1 | 25 | 399 | 49.878 | 0.406 |
+| 5 | 125 | 399 | 49.878 | 0.778 |
+| 10 | 250 | 399 | 49.880 | 0.933 |
 
 All four runs sustained the 20 TPS pacing target. The processing figure is Minecraft's internal rolling average, while wall ms/tick demonstrates pacing; they are intentionally reported separately. This benchmark exercises persistent entity and chunk/block-entity simulation overhead with idle companions. It does not include terrain generation, active navigation, combat, or inference traffic and must not be presented as the final ten-agent gameplay/cost gate.
 
