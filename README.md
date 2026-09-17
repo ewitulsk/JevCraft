@@ -21,7 +21,7 @@ Both editions include the same takeover controller: press F8 for the non-pausing
 
 See `docs/CAPABILITY_MATRIX.md` and `docs/VERIFICATION.md` for the difference between implemented mechanics, deterministic verification, and live Jev gameplay evidence.
 
-Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, and the private-message diagnostic fallback `/jev msg <name> <message>`. Only the owner or a server operator may assign or stop goals. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
+Companion commands are `/jev goal <name> <instruction>`, `/jev stop <name>`, and the private-message diagnostic fallback `/jev msg <name> <message>`. Owners and persisted administrators may assign or stop goals; an in-game access-management command remains to be added. Public chat is retained as bounded, attributed observation context and never becomes a goal by itself.
 
 ## Current maturity
 

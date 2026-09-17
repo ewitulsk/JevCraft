@@ -28,6 +28,7 @@ public final class JevCompanion extends PathfinderMob {
     private static final int CHAT_LIMIT = 32;
     private final SimpleContainer inventory = new SimpleContainer(36);
     private UUID owner;
+    private final Set<UUID> administrators = new LinkedHashSet<>();
     private String currentGoal = "";
     private long goalVersion;
     private int food = 20;
@@ -110,7 +111,11 @@ public final class JevCompanion extends PathfinderMob {
     public List<ChatObservation> recentChat() { return List.copyOf(recentChat); }
     public void setOwner(UUID owner) { this.owner = owner; }
     public UUID owner() { return owner; }
-    public boolean canCommand(ServerPlayer player) { return owner != null && (owner.equals(player.getUUID()) || player.hasPermissions(2)); }
+    public boolean canCommand(ServerPlayer player) { return owner != null && (owner.equals(player.getUUID()) || administrators.contains(player.getUUID()) || player.hasPermissions(2)); }
+    public boolean canManageAccess(ServerPlayer player) { return owner != null && (owner.equals(player.getUUID()) || player.hasPermissions(2)); }
+    public boolean addAdministrator(UUID player) { return administrators.add(player); }
+    public boolean removeAdministrator(UUID player) { return administrators.remove(player); }
+    public Set<UUID> administrators() { return Set.copyOf(administrators); }
     public void acceptGoal(String goal) { JevInferenceHost.instance().cancel(getUUID()); actions.cancel(); currentGoal = goal.strip(); goalVersion++; getNavigation().stop(); }
     public void stopNow() { JevInferenceHost.instance().cancel(getUUID()); actions.cancel(); currentGoal = ""; goalVersion++; getNavigation().stop(); setXxa(0); setZza(0); }
     public String currentGoal() { return currentGoal; }
@@ -145,6 +150,9 @@ public final class JevCompanion extends PathfinderMob {
     @Override public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         if (owner != null) tag.putUUID("Owner", owner);
+        ListTag admins = new ListTag();
+        for (UUID administrator : administrators) { CompoundTag entry = new CompoundTag(); entry.putUUID("Id", administrator); admins.add(entry); }
+        tag.put("Administrators", admins);
         tag.putString("Goal", currentGoal); tag.putLong("GoalVersion", goalVersion); tag.putInt("Food", food);
         tag.put("Inventory", inventory.createTag(registryAccess()));
         ListTag chat = new ListTag();
@@ -159,6 +167,8 @@ public final class JevCompanion extends PathfinderMob {
     @Override public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         owner = tag.hasUUID("Owner") ? tag.getUUID("Owner") : null;
+        administrators.clear();
+        for (var value : tag.getList("Administrators", 10)) if (value instanceof CompoundTag entry && entry.hasUUID("Id")) administrators.add(entry.getUUID("Id"));
         currentGoal = tag.getString("Goal"); goalVersion = tag.getLong("GoalVersion"); food = tag.contains("Food") ? tag.getInt("Food") : 20;
         inventory.fromTag(tag.getList("Inventory", 10), registryAccess());
         recentChat.clear();

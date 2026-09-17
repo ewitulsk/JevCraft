@@ -26,14 +26,15 @@ import java.util.UUID;
 public final class JevGameTests {
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionBodyInventoryAndGoalPersist(GameTestHelper helper) {
-        UUID owner = UUID.randomUUID();
+        UUID owner = UUID.randomUUID(), administrator = UUID.randomUUID();
         JevCompanion original = helper.spawn(JevCraft.JEV.get(), new BlockPos(2, 1, 2));
-        original.setOwner(owner); original.acceptGoal("follow me"); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 4));
+        original.setOwner(owner); original.addAdministrator(administrator); original.acceptGoal("follow me"); original.inventory().setItem(0, new ItemStack(Items.OAK_LOG, 4));
         CompoundTag saved = new CompoundTag(); original.addAdditionalSaveData(saved);
         JevCompanion restored = JevCraft.JEV.get().create(helper.getLevel());
         helper.assertTrue(restored != null, "registered companion type did not create");
         restored.readAdditionalSaveData(saved);
         helper.assertValueEqual(restored.owner(), owner, "owner UUID persistence");
+        helper.assertTrue(restored.administrators().contains(administrator), "administrator UUID persistence");
         helper.assertValueEqual(restored.currentGoal(), "follow me", "goal persistence");
         helper.assertValueEqual(restored.inventory().getItem(0).getCount(), 4, "inventory persistence");
         original.stopNow(); helper.assertTrue(original.currentGoal().isEmpty(), "stop did not synchronously clear goal");
