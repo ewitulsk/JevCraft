@@ -17,6 +17,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.CartographyTableMenu;
@@ -51,6 +52,7 @@ import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.common.util.FakePlayer;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
@@ -106,6 +108,7 @@ public final class CompanionInteractionContext {
         actor.setYRot((float)(Mth.atan2(delta.z,delta.x)*180/Math.PI)-90); actor.setYHeadRot(actor.getYRot()); actor.setXRot((float)-(Mth.atan2(delta.y,horizontal)*180/Math.PI));
         actor.getInventory().selected=0; actor.getInventory().setItem(0,companion.inventory().getItem(slot).copy());
         InteractionResult result=actor.gameMode.useItem(actor,level,actor.getInventory().getItem(0),InteractionHand.MAIN_HAND);
+        for(Projectile projectile:level.getEntitiesOfClass(Projectile.class,new AABB(actor.blockPosition()).inflate(3),candidate->candidate.getOwner()==actor))projectile.setOwner(companion);
         companion.inventory().setItem(slot,actor.getInventory().getItem(0).copy()); actor.getInventory().setItem(0,ItemStack.EMPTY); return result;
     }
 

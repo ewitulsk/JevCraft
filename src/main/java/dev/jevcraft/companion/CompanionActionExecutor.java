@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.effect.MobEffect;
@@ -142,6 +143,10 @@ public final class CompanionActionExecutor {
     public boolean equipInventoryStack(ServerLevel level,int sourceSlot,EquipmentSlot equipmentSlot){
         return interactions.equipInventoryStack(level,sourceSlot,equipmentSlot);
     }
+    public boolean raiseShield(ServerLevel level,int inventorySlot){
+        if(!companion.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD)&&!interactions.equipInventoryStack(level,inventorySlot,EquipmentSlot.OFFHAND))return false;if(!companion.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD))return false;companion.startUsingItem(InteractionHand.OFF_HAND);return companion.isUsingItem();
+    }
+    public void lowerShield(){if(companion.getUsedItemHand()==InteractionHand.OFF_HAND)companion.stopUsingItem();}
     public java.util.List<String> readSign(ServerLevel level,BlockPos pos,boolean front){
         return companion.distanceToSqr(Vec3.atCenterOf(pos))<=25?interactions.readSign(level,pos,front):java.util.List.of();
     }
