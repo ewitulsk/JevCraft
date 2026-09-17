@@ -42,6 +42,7 @@ public final class JevCompanion extends PathfinderMob {
     private ResourceKey<Level> respawnDimension;
     private BlockPos respawnPosition;
     private float respawnAngle;
+    private int sleepingTicks;
     private int lastChunkX = Integer.MIN_VALUE, lastChunkZ = Integer.MIN_VALUE;
     private final CompanionActionExecutor actions = new CompanionActionExecutor(this);
     private final Deque<ChatObservation> recentChat = new ArrayDeque<>();
@@ -56,8 +57,10 @@ public final class JevCompanion extends PathfinderMob {
     @Override public void tick() {
         super.tick();
         if (!level().isClientSide && level() instanceof ServerLevel serverLevel) {
+            sleepingTicks=isSleeping()?sleepingTicks+1:0;
             if (tickCount % 1200 == 0 && !currentGoal.isBlank()) food = Math.max(0, food - 1);
             activateChunkTickets(serverLevel);
+            if(isSleeping()){getNavigation().stop();return;}
             CompanionActionExecutor.Result result = actions.tick(serverLevel);
             if (result == CompanionActionExecutor.Result.IDLE) applySimpleGoal(serverLevel);
         }
@@ -160,6 +163,7 @@ public final class JevCompanion extends PathfinderMob {
     public ResourceKey<Level> respawnDimension() { return respawnDimension; }
     public BlockPos respawnPosition() { return respawnPosition; }
     public float respawnAngle() { return respawnAngle; }
+    public boolean companionSleepingLongEnough(){return isSleeping()&&sleepingTicks>=100;}
     public SimpleContainer inventory() { return inventory; }
     public CompanionActionExecutor actions() { return actions; }
     public boolean consumeFood(int slot) {

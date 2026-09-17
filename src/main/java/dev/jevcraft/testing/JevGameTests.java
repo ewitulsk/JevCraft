@@ -12,6 +12,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.core.Direction;
@@ -21,8 +22,10 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.server.level.ServerPlayer;
@@ -305,6 +308,28 @@ public final class JevGameTests {
         helper.assertTrue(entity.actions().interactEntity(helper.getLevel(),cow,8).consumesAction(),"lead interaction callback failed");
         helper.assertTrue(cow.getLeashHolder()==entity,"lead remained attached to the temporary player context");
         helper.assertTrue(entity.inventory().getItem(8).isEmpty(),"lead interaction did not consume the lead");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionSleepsWakesAndSetsBedSpawn(GameTestHelper helper) {
+        BlockPos foot=new BlockPos(3,1,2),head=foot.east();helper.setBlock(foot,Blocks.RED_BED.defaultBlockState().setValue(BedBlock.FACING,Direction.EAST).setValue(BedBlock.PART,BedPart.FOOT));helper.setBlock(head,Blocks.RED_BED.defaultBlockState().setValue(BedBlock.FACING,Direction.EAST).setValue(BedBlock.PART,BedPart.HEAD));
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));BlockPos absoluteFoot=helper.absolutePos(foot),absoluteHead=helper.absolutePos(head);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absoluteFoot),Direction.UP,absoluteFoot,false);helper.getLevel().setDayTime(13000);
+        helper.runAfterDelay(2,()->{
+            helper.assertTrue(entity.actions().sleepInBed(helper.getLevel(),hit),"normal nighttime bed callback did not admit companion");helper.assertTrue(entity.isSleeping(),"companion body did not become sleeper of record");helper.assertValueEqual(entity.getSleepingPos().orElse(null),absoluteHead,"sleeping position did not resolve to bed head");helper.assertValueEqual(entity.respawnPosition(),absoluteHead,"bed callback did not set persistent companion spawn");
+            helper.assertTrue(entity.actions().wakeUp(),"companion did not wake");helper.assertTrue(!entity.isSleeping(),"wake left companion sleeping");helper.assertTrue(!helper.getBlockState(head).getValue(BedBlock.OCCUPIED),"wake left bed occupied");helper.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", batch = "night_skip", timeoutTicks = 180)
+    public static void companionParticipatesInVanillaNightSkip(GameTestHelper helper) {
+        BlockPos foot=new BlockPos(3,1,2),head=foot.east();helper.setBlock(foot,Blocks.BLUE_BED.defaultBlockState().setValue(BedBlock.FACING,Direction.EAST).setValue(BedBlock.PART,BedPart.FOOT));helper.setBlock(head,Blocks.BLUE_BED.defaultBlockState().setValue(BedBlock.FACING,Direction.EAST).setValue(BedBlock.PART,BedPart.HEAD));
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));BlockPos absolute=helper.absolutePos(foot);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.getLevel().getGameRules().getRule(GameRules.RULE_PLAYERS_SLEEPING_PERCENTAGE).set(50,helper.getLevel().getServer());helper.getLevel().setDayTime(13000);
+        helper.runAfterDelay(2,()->helper.assertTrue(entity.actions().sleepInBed(helper.getLevel(),hit),"companion could not begin night-skip sleep"));
+        helper.runAfterDelay(115,()->{
+            long time=helper.getLevel().getDayTime()%24000;helper.getLevel().getGameRules().getRule(GameRules.RULE_PLAYERS_SLEEPING_PERCENTAGE).set(100,helper.getLevel().getServer());
+            helper.assertTrue(time<1000,"deep-sleep threshold did not advance to the next day");helper.assertTrue(!entity.isSleeping(),"night skip did not wake companion through bed lifecycle");helper.assertTrue(!helper.getBlockState(head).getValue(BedBlock.OCCUPIED),"night skip left companion bed occupied");helper.succeed();
+        });
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)

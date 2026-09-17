@@ -103,6 +103,17 @@ public final class CompanionInteractionContext {
         return result;
     }
 
+    /** Uses the normal server-player bed checks, then transfers sleep and respawn state to the companion body. */
+    public boolean sleepInBed(ServerLevel level, BlockHitResult hit) {
+        FakePlayer actor=player(level);if(actor.isSleeping())actor.stopSleeping();
+        actor.setRespawnPosition(level.dimension(),null,0,false,false);actor.getInventory().selected=0;actor.getInventory().setItem(0,ItemStack.EMPTY);
+        InteractionResult result=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);
+        BlockPos spawn=actor.getRespawnPosition();if(result.consumesAction()&&spawn!=null&&level.dimension().equals(actor.getRespawnDimension()))companion.setRespawnPoint(level.dimension(),spawn,companion.getYRot());
+        if(!actor.isSleeping())return false;
+        BlockPos sleeping=actor.getSleepingPos().orElse(null);actor.stopSleeping();if(sleeping==null)return false;
+        companion.startSleeping(sleeping);return companion.isSleeping();
+    }
+
     /** Transfers one complete stack through a real ChestMenu after normal block-use access succeeds. */
     public boolean quickMoveToContainer(ServerLevel level, BlockHitResult hit, int companionSlot) {
         if (companionSlot < 0 || companionSlot >= companion.inventory().getContainerSize()) return false;

@@ -90,6 +90,10 @@ public final class CompanionActionExecutor {
         if(!companion.isPassenger()) return false;
         companion.stopRiding(); return !companion.isPassenger();
     }
+    public boolean sleepInBed(ServerLevel level,BlockHitResult hit){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.sleepInBed(level,hit);
+    }
+    public boolean wakeUp(){if(!companion.isSleeping())return false;companion.stopSleeping();return !companion.isSleeping();}
 
     public Result tick(ServerLevel level) {
         if(rangedTarget!=null) return tickRanged(level);
