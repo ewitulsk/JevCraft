@@ -349,6 +349,13 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionRenamesItemAndPaysExperienceAtAnvil(GameTestHelper helper) {
+        BlockPos anvilPos=new BlockPos(3,1,2);helper.setBlock(anvilPos,Blocks.ANVIL);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.IRON_SWORD));entity.setExperience(5,55,0);BlockPos absolute=helper.absolutePos(anvilPos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().renameAtAnvil(helper.getLevel(),hit,0,"Jev Blade"),"anvil rename transaction failed");int named=0;for(int i=0;i<entity.inventory().getContainerSize();i++){ItemStack stack=entity.inventory().getItem(i);if(stack.is(Items.IRON_SWORD)&&stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)&&stack.getHoverName().getString().equals("Jev Blade"))named+=stack.getCount();}
+        helper.assertValueEqual(named,1,"anvil did not return exactly one correctly named sword");helper.assertValueEqual(entity.experienceLevel(),4,"anvil did not charge exactly one companion XP level");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));

@@ -12,6 +12,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
+import net.minecraft.world.inventory.AnvilMenu;
 import net.minecraft.world.inventory.BlastFurnaceMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
@@ -273,6 +274,16 @@ public final class CompanionInteractionContext {
         if(bannerMenu<0||dyeMenu<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(bannerMenu,0,ClickType.PICKUP,actor);menu.clicked(menu.slots.indexOf(menu.getBannerSlot()),1,ClickType.PICKUP,actor);menu.clicked(bannerMenu,0,ClickType.PICKUP,actor);menu.clicked(dyeMenu,0,ClickType.PICKUP,actor);menu.clicked(menu.slots.indexOf(menu.getDyeSlot()),1,ClickType.PICKUP,actor);menu.clicked(dyeMenu,0,ClickType.PICKUP,actor);
         if(patternIndex<0||patternIndex>=menu.getSelectablePatterns().size()||!menu.clickMenuButton(actor,patternIndex)||!menu.getResultSlot().hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getResultSlot().getItem().copy();menu.clicked(menu.slots.indexOf(menu.getResultSlot()),0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean exact=countItem(companion.inventory(),banner)==bannerBefore-1&&countItem(companion.inventory(),dye)==dyeBefore-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
+    }
+
+    /** Renames one item through the real anvil result callback and charges the companion's own XP level. */
+    public boolean renameAtAnvil(ServerLevel level,BlockHitResult hit,int inputSlot,String name){
+        if(inputSlot<0||inputSlot>=companion.inventory().getContainerSize()||companion.inventory().getItem(inputSlot).isEmpty()||name==null||name.isBlank()||name.length()>50)return false;
+        ItemStack input=companion.inventory().getItem(inputSlot).copy();FakePlayer actor=player(level);syncToPlayer(actor);actor.experienceLevel=companion.experienceLevel();actor.totalExperience=companion.totalExperience();actor.experienceProgress=companion.experienceProgress();int destination=emptySlot();if(destination<0){clearPlayer(actor);return false;}actor.getInventory().selected=destination<9?destination:0;
+        ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);if(!access.consumesAction()){clearPlayer(actor);return false;}
+        AnvilMenu menu=new AnvilMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int sourceMenu=playerMenuSlot(menu,actor,inputSlot),destinationMenu=playerMenuSlot(menu,actor,destination),levelBefore=actor.experienceLevel;if(sourceMenu<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
+        menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(sourceMenu,0,ClickType.PICKUP,actor);if(!menu.setItemName(name)||!menu.getSlot(2).hasItem()||menu.getCost()<=0||menu.getCost()>levelBefore){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(2).getItem().copy();int cost=menu.getCost();menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);companion.setExperience(actor.experienceLevel,actor.totalExperience,actor.experienceProgress);
+        boolean exact=countItem(companion.inventory(),input)==0&&countItem(companion.inventory(),result)>=result.getCount()&&companion.experienceLevel()==levelBefore-cost;clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
