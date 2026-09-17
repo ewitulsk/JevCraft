@@ -6,6 +6,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.item.ArrowItem;
+import net.minecraft.world.item.BowItem;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -17,6 +21,8 @@ public final class CompanionActionExecutor {
     private final CompanionInteractionContext interactions;
     private BlockPos miningTarget;
     private float miningProgress;
+    private LivingEntity rangedTarget;
+    private int bowSlot=-1,ammoSlot=-1,rangedTicks;
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
 
@@ -26,7 +32,10 @@ public final class CompanionActionExecutor {
     public void beginMine(BlockPos target, long goalVersion) {
         miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;
     }
-    public void cancel() { miningTarget = null; miningProgress = 0; companion.getNavigation().stop(); }
+    public void beginRangedAttack(LivingEntity target,int bowSlot,int ammoSlot,long goalVersion){
+        rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;
+    }
+    public void cancel() { miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0; companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public float miningProgress() { return miningProgress; }
@@ -69,6 +78,7 @@ public final class CompanionActionExecutor {
     }
 
     public Result tick(ServerLevel level) {
+        if(rangedTarget!=null) return tickRanged(level);
         if (miningTarget == null) return lastResult = Result.IDLE;
         if (actionGoalVersion != companion.goalVersion()) { cancel(); return lastResult = Result.INVALID; }
         BlockState state = level.getBlockState(miningTarget);
@@ -92,5 +102,19 @@ public final class CompanionActionExecutor {
         level.destroyBlockProgress(companion.getId(), miningTarget, -1);
         miningTarget = null; miningProgress = 0;
         return lastResult = success ? Result.SUCCEEDED : Result.INVALID;
+    }
+    private Result tickRanged(ServerLevel level){
+        if(actionGoalVersion!=companion.goalVersion()||!rangedTarget.isAlive()||rangedTarget.level()!=level||bowSlot<0||bowSlot>=companion.inventory().getContainerSize()||ammoSlot<0||ammoSlot>=companion.inventory().getContainerSize()){
+            cancel();return lastResult=Result.INVALID;
+        }
+        ItemStack bow=companion.inventory().getItem(bowSlot),ammo=companion.inventory().getItem(ammoSlot);
+        if(!(bow.getItem() instanceof BowItem)||!(ammo.getItem() instanceof ArrowItem arrowItem)||ammo.isEmpty()) {cancel();return lastResult=Result.INVALID;}
+        if(companion.distanceToSqr(rangedTarget)>225||!companion.hasLineOfSight(rangedTarget)){cancel();return lastResult=Result.INVALID;}
+        companion.getNavigation().stop();companion.getLookControl().setLookAt(rangedTarget,30,30);
+        if(++rangedTicks<20)return lastResult=Result.WORKING;
+        ItemStack projectileStack=ammo.split(1);AbstractArrow arrow=arrowItem.createArrow(level,projectileStack,companion,bow);
+        Vec3 delta=rangedTarget.getEyePosition().subtract(arrow.position());double horizontal=Math.sqrt(delta.x*delta.x+delta.z*delta.z);
+        arrow.shoot(delta.x,delta.y+horizontal*.03,delta.z,2.0F,0.0F);level.addFreshEntity(arrow);bow.hurtAndBreak(1,level,companion,item->{});
+        rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;return lastResult=Result.SUCCEEDED;
     }
 }

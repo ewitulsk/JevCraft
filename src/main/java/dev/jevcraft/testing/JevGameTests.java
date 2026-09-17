@@ -215,6 +215,34 @@ public final class JevGameTests {
         helper.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 160)
+    public static void companionRangedAttackUsesOwnedVanillaArrow(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2)); entity.setOwner(UUID.randomUUID()); entity.acceptGoal("defend");
+        var target=helper.spawn(EntityType.COW,new BlockPos(7,1,2)); target.setNoAi(true); float health=target.getHealth();
+        entity.inventory().setItem(0,new ItemStack(Items.BOW));entity.inventory().setItem(1,new ItemStack(Items.ARROW,3));
+        entity.actions().beginRangedAttack(target,0,1,entity.goalVersion());
+        helper.succeedWhen(()->{
+            helper.assertTrue(target.getHealth()<health,"owned arrow did not damage target");
+            helper.assertValueEqual(entity.inventory().getItem(1).getCount(),2,"ranged attack did not consume exactly one arrow");
+            helper.assertValueEqual(entity.inventory().getItem(0).getDamageValue(),1,"ranged attack did not damage bow exactly once");
+            helper.assertTrue(entity.getLastHurtMob()==target,"projectile combat was not attributed to companion");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void stoppingMidBowDrawConsumesNothing(GameTestHelper helper) {
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.setOwner(UUID.randomUUID());entity.acceptGoal("defend");
+        var target=helper.spawn(EntityType.COW,new BlockPos(7,1,2));target.setNoAi(true);float health=target.getHealth();
+        entity.inventory().setItem(0,new ItemStack(Items.BOW));entity.inventory().setItem(1,new ItemStack(Items.ARROW,3));entity.actions().beginRangedAttack(target,0,1,entity.goalVersion());
+        helper.runAfterDelay(10,entity::stopNow);
+        helper.runAfterDelay(35,()->{
+            helper.assertTrue(target.getHealth()==health,"cancelled bow draw still damaged target");
+            helper.assertValueEqual(entity.inventory().getItem(1).getCount(),3,"cancelled bow draw consumed ammunition");
+            helper.assertValueEqual(entity.inventory().getItem(0).getDamageValue(),0,"cancelled bow draw damaged bow");
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionDepositsThroughRealChestMenu(GameTestHelper helper) {
         BlockPos chestPos = new BlockPos(3, 1, 2);
