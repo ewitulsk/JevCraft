@@ -22,6 +22,16 @@ neoForge {
             programArgument '--nogui'
             jvmArgument '-Xmx2G'
         }
+        hiddenServer {
+            server(); gameDirectory = file(findProperty('jevcraftServerDir') ?: 'runs/hidden-server')
+            programArgument '--nogui'; systemProperty 'jevcraft.hiddenClientTest', 'true'; jvmArgument '-Xmx2G'
+        }
+        hiddenClient {
+            client(); gameDirectory = file(findProperty('jevcraftClientDir') ?: 'runs/hidden-client')
+            systemProperty 'jevcraft.hiddenClient', 'true'; systemProperty 'jevcraft.hiddenClientTest', 'true'
+            systemProperty 'jevcraft.testPort', (findProperty('jevcraftTestPort') ?: '25575').toString()
+            jvmArgument '-Xmx2G'
+        }
     }
     mods { jevcraft { sourceSet sourceSets.main } }
 }
@@ -74,6 +84,8 @@ tasks.register('clientOnlyJar', Jar) {
     from(sourceSets.main.output) {
         include 'dev/jevcraft/core/**'
         include 'dev/jevcraft/inference/**'
+        include 'dev/jevcraft/client/TakeoverRuntime*.class'
+        include 'dev/jevcraft/client/TakeoverScreen.class'
     }
     from sourceSets.clientOnly.output
     filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }

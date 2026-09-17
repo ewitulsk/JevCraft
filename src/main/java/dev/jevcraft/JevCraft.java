@@ -2,6 +2,7 @@ package dev.jevcraft;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.logging.LogUtils;
+import dev.jevcraft.client.TakeoverRuntime;
 import dev.jevcraft.companion.JevCompanion;
 import dev.jevcraft.companion.JevSpawnEggItem;
 import dev.jevcraft.companion.MovingChunkTickets;
@@ -12,8 +13,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.*;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.core.BlockPos;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -26,6 +31,7 @@ import net.minecraft.core.registries.Registries;
 import org.slf4j.Logger;
 
 import java.util.Locale;
+import java.util.Set;
 
 @Mod(JevCraft.MOD_ID)
 public final class JevCraft {
@@ -38,6 +44,7 @@ public final class JevCraft {
                     .clientTrackingRange(10).updateInterval(2).build("jevcraft:jev_companion"));
     public static final DeferredItem<JevSpawnEggItem> JEV_EGG = ITEMS.registerItem("jev_spawn_egg", JevSpawnEggItem::new,
             new Item.Properties().stacksTo(1).rarity(Rarity.RARE));
+    private boolean hiddenServerPassed;
 
     public JevCraft(IEventBus modBus) {
         ENTITIES.register(modBus); ITEMS.register(modBus);
@@ -48,6 +55,7 @@ public final class JevCraft {
         NeoForge.EVENT_BUS.addListener(this::login);
         NeoForge.EVENT_BUS.addListener(this::playerTick);
         NeoForge.EVENT_BUS.addListener(this::chat);
+        if (FMLEnvironment.dist == Dist.CLIENT) TakeoverRuntime.initialize(modBus);
         LOGGER.info("JevCraft initialized; credentials are read only from host configuration");
     }
 
@@ -59,10 +67,22 @@ public final class JevCraft {
         if (event.getTabKey() == CreativeModeTabs.SPAWN_EGGS) event.accept(JEV_EGG.get());
     }
     private void login(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) deliverStarterEgg(player);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (Boolean.getBoolean("jevcraft.hiddenClientTest")) {
+                var level=player.serverLevel();
+                for(int x=-3;x<=4;x++) for(int z=-3;z<=3;z++) level.setBlockAndUpdate(new BlockPos(x,1,z),Blocks.STONE.defaultBlockState());
+                level.setBlockAndUpdate(new BlockPos(3,2,0),Blocks.OAK_LOG.defaultBlockState());
+                player.teleportTo(level,.5,2,.5,Set.of(),0,0); player.getInventory().add(new ItemStack(Items.WOODEN_AXE));
+                LOGGER.info("HIDDEN_TAKEOVER_SERVER_READY");
+            } else deliverStarterEgg(player);
+        }
     }
     private void playerTick(PlayerTickEvent.Post event) {
-        if (event.getEntity() instanceof ServerPlayer player && player.tickCount % 20 == 0) deliverStarterEgg(player);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (Boolean.getBoolean("jevcraft.hiddenClientTest")) {
+                if (!hiddenServerPassed && player.serverLevel().getBlockState(new BlockPos(3,2,0)).isAir()) { hiddenServerPassed=true; LOGGER.info("HIDDEN_TAKEOVER_SERVER_PASS"); }
+            } else if (player.tickCount % 20 == 0) deliverStarterEgg(player);
+        }
     }
     private void deliverStarterEgg(ServerPlayer player) {
         if (player.isCreative()) return;

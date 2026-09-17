@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.jevcraft.mixin.testing",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["HiddenWindowMixin", "HiddenMouseMixin"],
+  "injectors": {"defaultRequire": 1}
+}

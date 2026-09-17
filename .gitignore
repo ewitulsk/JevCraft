@@ -11,4 +11,4 @@ runs/
 !.env.example
 config/jevcraft*.toml
 secrets/
-artifacts/live/
+artifacts/
