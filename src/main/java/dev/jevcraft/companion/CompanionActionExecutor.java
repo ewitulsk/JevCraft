@@ -45,6 +45,8 @@ public final class CompanionActionExecutor {
     private int crossbowSlot=-1,crossbowTicks;
     private LivingEntity tridentTarget;
     private int tridentSlot=-1,tridentTicks;
+    private Vec3 flightTarget;
+    private int flightTicks;
     private String lastFailure="";
     private long actionGoalVersion;
     private Result lastResult = Result.IDLE;
@@ -53,19 +55,20 @@ public final class CompanionActionExecutor {
         this.companion = companion; this.interactions = new CompanionInteractionContext(companion);
     }
     public void beginMine(BlockPos target, long goalVersion) {
-        restoreChargedWeapons();miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
+        restoreChargedWeapons();stopFlight();miningTarget = Objects.requireNonNull(target).immutable(); miningProgress = 0; actionGoalVersion = goalVersion;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginRangedAttack(LivingEntity target,int bowSlot,int ammoSlot,long goalVersion){
-        restoreChargedWeapons();rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
+        restoreChargedWeapons();stopFlight();rangedTarget=Objects.requireNonNull(target);this.bowSlot=bowSlot;this.ammoSlot=ammoSlot;rangedTicks=0;actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;
     }
     public void beginMove(Vec3 target,double speed,long goalVersion){
-        restoreChargedWeapons();movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();
+        restoreChargedWeapons();stopFlight();movementTarget=Objects.requireNonNull(target);movementSpeed=Math.max(.1,Math.min(2,speed));movementTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();
     }
-    public void beginClimb(Vec3 target,long goalVersion){restoreChargedWeapons();climbTarget=Objects.requireNonNull(target);climbTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();}
-    public void beginSwim(Vec3 target,long goalVersion){restoreChargedWeapons();swimTarget=Objects.requireNonNull(target);swimTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;companion.getNavigation().stop();}
-    public void beginCrossbowAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();crossbowTarget=Objects.requireNonNull(target);crossbowSlot=weaponSlot;crossbowTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
-    public void beginTridentAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();tridentTarget=Objects.requireNonNull(target);tridentSlot=weaponSlot;tridentTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
-    public void cancel() { restoreChargedWeapons();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
+    public void beginClimb(Vec3 target,long goalVersion){restoreChargedWeapons();stopFlight();climbTarget=Objects.requireNonNull(target);climbTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;swimTarget=null;swimTicks=0;companion.getNavigation().stop();}
+    public void beginSwim(Vec3 target,long goalVersion){restoreChargedWeapons();stopFlight();swimTarget=Objects.requireNonNull(target);swimTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;miningProgress=0;rangedTarget=null;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;companion.getNavigation().stop();}
+    public void beginCrossbowAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();stopFlight();crossbowTarget=Objects.requireNonNull(target);crossbowSlot=weaponSlot;crossbowTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
+    public void beginTridentAttack(LivingEntity target,int weaponSlot,long goalVersion){restoreChargedWeapons();stopFlight();tridentTarget=Objects.requireNonNull(target);tridentSlot=weaponSlot;tridentTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();}
+    public boolean beginCreativeFlight(Vec3 target,long goalVersion){if(!companion.creativeMode()||target==null||!Double.isFinite(target.x)||!Double.isFinite(target.y)||!Double.isFinite(target.z))return false;restoreChargedWeapons();flightTarget=target;flightTicks=0;lastFailure="";actionGoalVersion=goalVersion;miningTarget=null;rangedTarget=null;movementTarget=null;climbTarget=null;swimTarget=null;companion.getNavigation().stop();companion.setNoGravity(true);return true;}
+    public void cancel() { restoreChargedWeapons();stopFlight();miningTarget = null; miningProgress = 0; rangedTarget=null;bowSlot=-1;ammoSlot=-1;rangedTicks=0;movementTarget=null;movementTicks=0;climbTarget=null;climbTicks=0;swimTarget=null;swimTicks=0;companion.setSwimming(false);Vec3 velocity=companion.getDeltaMovement();companion.setDeltaMovement(0,Math.min(velocity.y,0),0);companion.getNavigation().stop(); }
     public BlockPos miningTarget() { return miningTarget; }
     public Result lastResult() { return lastResult; }
     public String lastFailure(){return lastFailure;}
@@ -185,6 +188,7 @@ public final class CompanionActionExecutor {
     public boolean wakeUp(){if(!companion.isSleeping())return false;companion.stopSleeping();return !companion.isSleeping();}
 
     public Result tick(ServerLevel level) {
+        if(flightTarget!=null)return tickFlight();
         if(tridentTarget!=null)return tickTrident(level);
         if(crossbowTarget!=null)return tickCrossbow(level);
         if(rangedTarget!=null) return tickRanged(level);
@@ -232,6 +236,10 @@ public final class CompanionActionExecutor {
         if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}if(++swimTicks>400){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}if(companion.distanceToSqr(swimTarget)<=1.5){Vec3 correction=swimTarget.subtract(companion.position());companion.setSwimming(true);companion.setDeltaMovement(correction.scale(.08));return lastResult=Result.SUCCEEDED;}if(!companion.isInWater()&&swimTicks>12){lastFailure="left_water";cancel();return lastResult=Result.INVALID;}
         Vec3 delta=swimTarget.subtract(companion.position()),direction=delta.normalize();companion.setSwimming(true);companion.setDeltaMovement(direction.x*.16,Mth.clamp(delta.y,-.12,.16),direction.z*.16);companion.getLookControl().setLookAt(swimTarget);return lastResult=Result.MOVING;
     }
+    private Result tickFlight(){
+        if(actionGoalVersion!=companion.goalVersion()||!companion.creativeMode()){lastFailure=companion.creativeMode()?"stale_goal":"creative_revoked";stopFlight();return lastResult=Result.INVALID;}if(++flightTicks>400){lastFailure="timeout";stopFlight();return lastResult=Result.INVALID;}Vec3 delta=flightTarget.subtract(companion.position());double distance=delta.length();if(distance*distance<=2.25){companion.setDeltaMovement(delta.scale(.08));return lastResult=Result.SUCCEEDED;}companion.setDeltaMovement(delta.normalize().scale(Math.min(.28,distance*.12)));companion.fallDistance=0;companion.getLookControl().setLookAt(flightTarget);return lastResult=Result.MOVING;
+    }
+    private void stopFlight(){if(flightTarget!=null||companion.isNoGravity()){flightTarget=null;flightTicks=0;companion.setNoGravity(false);}}
     private void openNearbyFenceGates(ServerLevel level){
         BlockPos center=companion.blockPosition();
         for(BlockPos candidate:BlockPos.betweenClosed(center.offset(-2,-1,-2),center.offset(2,1,2))){
