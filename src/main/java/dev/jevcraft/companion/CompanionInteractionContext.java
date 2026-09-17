@@ -17,6 +17,7 @@ import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.GrindstoneMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.SmokerMenu;
 import net.minecraft.world.inventory.StonecutterMenu;
@@ -224,11 +225,11 @@ public final class CompanionInteractionContext {
     }
 
     public boolean collectFurnace(ServerLevel level,BlockHitResult hit){
-        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=emptySlot();if(handSlot<0){clearPlayer(actor);return false;}actor.getInventory().selected=handSlot<9?handSlot:0;
         ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
         InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
         BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
-        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);
+        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
     }
 
@@ -246,6 +247,19 @@ public final class CompanionInteractionContext {
         if(recipe<0||!menu.clickMenuButton(actor,recipe)||!menu.getSlot(1).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}
         ItemStack result=menu.getSlot(1).getItem().copy();int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(1,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean exact=countItem(companion.inventory(),input)==inputBefore-1&&countItem(companion.inventory(),result)>=resultBefore+result.getCount();clearPlayer(actor);return exact;
+    }
+
+    /** Repairs or disenchants through the real grindstone input and result callbacks. */
+    public boolean grind(ServerLevel level,BlockHitResult hit,int inputSlot,int additionalSlot){
+        if(inputSlot<0||additionalSlot<0||inputSlot==additionalSlot||inputSlot>=companion.inventory().getContainerSize()||additionalSlot>=companion.inventory().getContainerSize())return false;
+        ItemStack first=companion.inventory().getItem(inputSlot),second=companion.inventory().getItem(additionalSlot);if(first.isEmpty()||second.isEmpty()||first.getItem()!=second.getItem())return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);if(!access.consumesAction()){clearPlayer(actor);return false;}
+        GrindstoneMenu menu=new GrindstoneMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int firstMenu=playerMenuSlot(menu,actor,inputSlot),secondMenu=playerMenuSlot(menu,actor,additionalSlot),destinationMenu=playerMenuSlot(menu,actor,handSlot);int before=countItemType(actor.getInventory(),first.getItem());
+        if(firstMenu<0||secondMenu<0||destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}
+        menu.clicked(firstMenu,0,ClickType.PICKUP,actor);menu.clicked(0,1,ClickType.PICKUP,actor);menu.clicked(firstMenu,0,ClickType.PICKUP,actor);menu.clicked(secondMenu,0,ClickType.PICKUP,actor);menu.clicked(1,1,ClickType.PICKUP,actor);menu.clicked(secondMenu,0,ClickType.PICKUP,actor);
+        if(!menu.getSlot(2).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}ItemStack result=menu.getSlot(2).getItem().copy();menu.clicked(2,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
+        boolean exact=countItemType(companion.inventory(),first.getItem())==before-1&&countItem(companion.inventory(),result)>=result.getCount();clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){
@@ -268,6 +282,7 @@ public final class CompanionInteractionContext {
             if (i != except && companion.inventory().getItem(i).isEmpty()) return i;
         return except < 9 ? (except + 1) % 9 : 0;
     }
+    private int emptySlot(){for(int i=0;i<companion.inventory().getContainerSize();i++)if(companion.inventory().getItem(i).isEmpty())return i;return -1;}
     private void syncToPlayer(FakePlayer actor) {
         for (int i = 0; i < companion.inventory().getContainerSize(); i++) actor.getInventory().setItem(i, companion.inventory().getItem(i).copy());
     }
@@ -287,4 +302,5 @@ public final class CompanionInteractionContext {
         for (int i = 0; i < container.getContainerSize(); i++) if (ItemStack.isSameItemSameComponents(container.getItem(i), target)) total += container.getItem(i).getCount();
         return total;
     }
+    private static int countItemType(Container container,Item target){int total=0;for(int i=0;i<container.getContainerSize();i++)if(container.getItem(i).is(target))total+=container.getItem(i).getCount();return total;}
 }

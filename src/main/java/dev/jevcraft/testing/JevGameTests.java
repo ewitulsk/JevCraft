@@ -335,6 +335,13 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionRepairsThroughGrindstoneMenu(GameTestHelper helper) {
+        BlockPos grindstonePos=new BlockPos(3,1,2);helper.setBlock(grindstonePos,Blocks.GRINDSTONE);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));ItemStack first=new ItemStack(Items.IRON_SWORD),second=new ItemStack(Items.IRON_SWORD);first.setDamageValue(200);second.setDamageValue(200);entity.inventory().setItem(0,first);entity.inventory().setItem(1,second);
+        BlockPos absolute=helper.absolutePos(grindstonePos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);helper.assertTrue(entity.actions().grind(helper.getLevel(),hit,0,1),"grindstone menu transaction failed");
+        int swords=0,damage=-1;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.IRON_SWORD)){swords+=entity.inventory().getItem(i).getCount();damage=entity.inventory().getItem(i).getDamageValue();}helper.assertValueEqual(swords,1,"grindstone did not combine exactly two swords into one");helper.assertValueEqual(damage,138,"grindstone did not apply vanilla repair durability");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));
