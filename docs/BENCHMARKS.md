@@ -21,9 +21,9 @@ Measured September 17, 2026 with `gradlew liveGatewayScale`, Vercel AI Gateway, 
 
 | Actors | Repeats | Requests | Input tokens | Output tokens | Wall time | p50 latency | p95 latency | Estimated input cost |
 |---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 3 | 3 | 1,291 | 225 | 1,462 ms | 234 ms | 995 ms | $0.00005164 |
-| 5 | 3 | 15 | 6,455 | 1,125 | 2,335 ms | 254 ms | 306 ms | $0.00025820 |
-| 10 | 3 | 30 | 12,910 | 2,250 | 4,570 ms | 246 ms | 466 ms | $0.00051640 |
+| 1 | 3 | 3 | 1,291 | 222 | 1,262 ms | 276 ms | 732 ms | $0.00005164 |
+| 5 | 3 | 15 | 6,455 | 1,110 | 2,804 ms | 243 ms | 461 ms | $0.00025820 |
+| 10 | 3 | 30 | 12,910 | 2,220 | 3,982 ms | 235 ms | 323 ms | $0.00051640 |
 
 All 48 calls completed without a rate-limit response. Cost uses the configured $0.04 per million input tokens and is explicitly an input-only estimate; output tokens are reported but not silently assigned a price. This benchmark proves typed transport capacity and account behavior, not ten simultaneous Minecraft task completions.
 
