@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -253,6 +254,22 @@ public final class JevGameTests {
         int pickaxes=0;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.WOODEN_PICKAXE))pickaxes+=entity.inventory().getItem(i).getCount();
         helper.assertValueEqual(pickaxes,1,"shaped recipe did not return exactly one wooden pickaxe");
         helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 320)
+    public static void companionLoadsSmeltsAndCollectsThroughFurnaceMenu(GameTestHelper helper) {
+        BlockPos furnacePos=new BlockPos(3,1,2);helper.setBlock(furnacePos,Blocks.FURNACE);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));
+        entity.inventory().setItem(5,new ItemStack(Items.RAW_IRON));entity.inventory().setItem(6,new ItemStack(Items.COAL));BlockPos absolute=helper.absolutePos(furnacePos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().loadFurnace(helper.getLevel(),hit,5,6),"furnace menu did not accept input and fuel");
+        helper.assertTrue(entity.inventory().getItem(5).isEmpty()&&entity.inventory().getItem(6).isEmpty(),"furnace loading did not move authoritative stacks");
+        helper.succeedWhen(()->{
+            helper.assertTrue(helper.getLevel().getBlockEntity(absolute) instanceof AbstractFurnaceBlockEntity,"furnace block entity disappeared");
+            AbstractFurnaceBlockEntity furnace=(AbstractFurnaceBlockEntity)helper.getLevel().getBlockEntity(absolute);
+            helper.assertTrue(furnace.getItem(2).is(Items.IRON_INGOT),"normal furnace ticking has not produced iron");
+            helper.assertTrue(entity.actions().collectFurnace(helper.getLevel(),hit),"furnace result menu callback failed");
+            int ingots=0;for(int i=0;i<entity.inventory().getContainerSize();i++)if(entity.inventory().getItem(i).is(Items.IRON_INGOT))ingots+=entity.inventory().getItem(i).getCount();
+            helper.assertValueEqual(ingots,1,"furnace collection did not return exactly one iron ingot");
+        });
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)

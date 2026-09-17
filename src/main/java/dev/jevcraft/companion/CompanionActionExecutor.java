@@ -66,6 +66,12 @@ public final class CompanionActionExecutor {
         if(companion.distanceToSqr(hit.getLocation())>25)return false;
         return interactions.craftPattern(level,hit,ingredientSlots);
     }
+    public boolean loadFurnace(ServerLevel level,BlockHitResult hit,int inputSlot,int fuelSlot){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.loadFurnace(level,hit,inputSlot,fuelSlot);
+    }
+    public boolean collectFurnace(ServerLevel level,BlockHitResult hit){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.collectFurnace(level,hit);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);

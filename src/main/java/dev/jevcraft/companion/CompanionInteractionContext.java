@@ -12,8 +12,11 @@ import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.FurnaceMenu;
+import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.util.Mth;
@@ -162,6 +165,26 @@ public final class CompanionInteractionContext {
         if(!menu.getSlot(0).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}
         ItemStack result=menu.getSlot(0).getItem().copy();int before=countItem(actor.getInventory(),result);
         menu.clicked(0,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);boolean received=countItem(companion.inventory(),result)>=before+result.getCount();clearPlayer(actor);return received;
+    }
+
+    public boolean loadFurnace(ServerLevel level,BlockHitResult hit,int inputSlot,int fuelSlot){
+        if(inputSlot<0||fuelSlot<0||inputSlot>=companion.inventory().getContainerSize()||fuelSlot>=companion.inventory().getContainerSize())return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
+        ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
+        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)){clearPlayer(actor);return false;}
+        FurnaceMenu menu=new FurnaceMenu(0,actor.getInventory(),furnace,new SimpleContainerData(4));int inputMenu=playerMenuSlot(menu,actor,inputSlot),fuelMenu=playerMenuSlot(menu,actor,fuelSlot);
+        int inputBefore=furnace.getItem(0).getCount(),fuelBefore=furnace.getItem(1).getCount();if(inputMenu>=0)menu.clicked(inputMenu,0,ClickType.QUICK_MOVE,actor);if(fuelMenu>=0)menu.clicked(fuelMenu,0,ClickType.QUICK_MOVE,actor);
+        menu.removed(actor);syncFromPlayer(actor);boolean loaded=furnace.getItem(0).getCount()>inputBefore&&furnace.getItem(1).getCount()>fuelBefore;clearPlayer(actor);return loaded;
+    }
+
+    public boolean collectFurnace(ServerLevel level,BlockHitResult hit){
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(-1);actor.getInventory().selected=handSlot<9?handSlot:0;
+        ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
+        BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
+        ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);FurnaceMenu menu=new FurnaceMenu(0,actor.getInventory(),furnace,new SimpleContainerData(4));menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);
+        boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
     }
 
     private static int playerMenuSlot(net.minecraft.world.inventory.AbstractContainerMenu menu, FakePlayer actor, int inventorySlot) {
