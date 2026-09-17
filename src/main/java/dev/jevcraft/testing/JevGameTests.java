@@ -327,6 +327,14 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionUsesStonecutterMenu(GameTestHelper helper) {
+        BlockPos cutterPos=new BlockPos(3,1,2);helper.setBlock(cutterPos,Blocks.STONECUTTER);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,new ItemStack(Items.STONE,2));
+        BlockPos absolute=helper.absolutePos(cutterPos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().stonecut(helper.getLevel(),hit,0,Items.STONE_BRICKS),"stonecutter menu transaction failed");int stones=0,bricks=0;for(int i=0;i<entity.inventory().getContainerSize();i++){if(entity.inventory().getItem(i).is(Items.STONE))stones+=entity.inventory().getItem(i).getCount();if(entity.inventory().getItem(i).is(Items.STONE_BRICKS))bricks+=entity.inventory().getItem(i).getCount();}
+        helper.assertValueEqual(stones,1,"stonecutter did not consume exactly one stone");helper.assertValueEqual(bricks,1,"stonecutter did not return exactly one stone brick");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));

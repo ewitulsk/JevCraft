@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.Container;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -18,6 +19,7 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.FurnaceMenu;
 import net.minecraft.world.inventory.MerchantMenu;
 import net.minecraft.world.inventory.SmokerMenu;
+import net.minecraft.world.inventory.StonecutterMenu;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -228,6 +230,22 @@ public final class CompanionInteractionContext {
         BlockEntity blockEntity=level.getBlockEntity(hit.getBlockPos());if(!access.consumesAction()||!(blockEntity instanceof AbstractFurnaceBlockEntity furnace)||furnace.getItem(2).isEmpty()){clearPlayer(actor);return false;}
         ItemStack result=furnace.getItem(2).copy();int before=countItem(actor.getInventory(),result);AbstractFurnaceMenu menu=furnaceMenu(actor,furnace);menu.clicked(2,0,ClickType.QUICK_MOVE,actor);menu.removed(actor);syncFromPlayer(actor);
         boolean collected=countItem(companion.inventory(),result)>=before+result.getCount()&&furnace.getItem(2).isEmpty();clearPlayer(actor);return collected;
+    }
+
+    /** Selects a requested stonecutting result and takes it through the real result slot callback. */
+    public boolean stonecut(ServerLevel level,BlockHitResult hit,int inputSlot,Item requestedResult){
+        if(inputSlot<0||inputSlot>=companion.inventory().getContainerSize()||companion.inventory().getItem(inputSlot).isEmpty()||requestedResult==null)return false;
+        FakePlayer actor=player(level);syncToPlayer(actor);int handSlot=firstEmptySlot(inputSlot);actor.getInventory().selected=handSlot<9?handSlot:0;
+        ItemStack held=actor.getMainHandItem().copy();actor.getInventory().setItem(actor.getInventory().selected,ItemStack.EMPTY);
+        InteractionResult access=actor.gameMode.useItemOn(actor,level,actor.getMainHandItem(),InteractionHand.MAIN_HAND,hit);actor.getInventory().setItem(actor.getInventory().selected,held);
+        if(!access.consumesAction()){clearPlayer(actor);return false;}
+        StonecutterMenu menu=new StonecutterMenu(0,actor.getInventory(),ContainerLevelAccess.create(level,hit.getBlockPos()));int sourceMenu=playerMenuSlot(menu,actor,inputSlot);ItemStack input=actor.getInventory().getItem(inputSlot).copy();
+        int inputBefore=countItem(actor.getInventory(),input),resultBefore=countItem(actor.getInventory(),new ItemStack(requestedResult));
+        if(sourceMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(sourceMenu,0,ClickType.QUICK_MOVE,actor);
+        int recipe=-1;for(int i=0;i<menu.getRecipes().size();i++)if(menu.getRecipes().get(i).value().getResultItem(level.registryAccess()).is(requestedResult)){recipe=i;break;}
+        if(recipe<0||!menu.clickMenuButton(actor,recipe)||!menu.getSlot(1).hasItem()){menu.removed(actor);syncFromPlayer(actor);clearPlayer(actor);return false;}
+        ItemStack result=menu.getSlot(1).getItem().copy();int destinationMenu=playerMenuSlot(menu,actor,handSlot);if(destinationMenu<0){menu.removed(actor);clearPlayer(actor);return false;}menu.clicked(1,0,ClickType.PICKUP,actor);menu.clicked(destinationMenu,0,ClickType.PICKUP,actor);menu.removed(actor);syncFromPlayer(actor);
+        boolean exact=countItem(companion.inventory(),input)==inputBefore-1&&countItem(companion.inventory(),result)>=resultBefore+result.getCount();clearPlayer(actor);return exact;
     }
 
     private static AbstractFurnaceMenu furnaceMenu(FakePlayer actor,AbstractFurnaceBlockEntity furnace){

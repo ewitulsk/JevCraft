@@ -12,6 +12,7 @@ import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.item.ArrowItem;
 import net.minecraft.world.item.BowItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
@@ -88,6 +89,9 @@ public final class CompanionActionExecutor {
     }
     public boolean collectFurnace(ServerLevel level,BlockHitResult hit){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.collectFurnace(level,hit);
+    }
+    public boolean stonecut(ServerLevel level,BlockHitResult hit,int inputSlot,Item requestedResult){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.stonecut(level,hit,inputSlot,requestedResult);
     }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
