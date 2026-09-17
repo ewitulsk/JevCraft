@@ -376,6 +376,12 @@ public final class JevGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
+    public static void companionScalesMapThroughCartographyMenu(GameTestHelper helper) {
+        BlockPos tablePos=new BlockPos(3,1,2);helper.setBlock(tablePos,Blocks.CARTOGRAPHY_TABLE);JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));entity.inventory().setItem(0,net.minecraft.world.item.MapItem.create(helper.getLevel(),0,0,(byte)0,true,false));entity.inventory().setItem(1,new ItemStack(Items.PAPER));BlockPos absolute=helper.absolutePos(tablePos);BlockHitResult hit=new BlockHitResult(Vec3.atCenterOf(absolute),Direction.UP,absolute,false);
+        helper.assertTrue(entity.actions().cartography(helper.getLevel(),hit,0,1),"cartography-table menu transaction failed");int paper=0,maps=0,scale=-1;for(int i=0;i<entity.inventory().getContainerSize();i++){ItemStack stack=entity.inventory().getItem(i);if(stack.is(Items.PAPER))paper+=stack.getCount();if(stack.is(Items.FILLED_MAP)){maps+=stack.getCount();var data=net.minecraft.world.item.MapItem.getSavedData(stack,helper.getLevel());if(data!=null)scale=data.scale;}}helper.assertValueEqual(paper,0,"cartography did not consume exactly one paper");helper.assertValueEqual(maps,1,"cartography did not return exactly one filled map");helper.assertValueEqual(scale,1,"cartography did not apply vanilla map scaling");helper.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 100)
     public static void companionFeedsAnimalsThroughNormalEntityCallbacks(GameTestHelper helper) {
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(2,1,2));Cow first=helper.spawn(EntityType.COW,new BlockPos(3,1,2));Cow second=helper.spawn(EntityType.COW,new BlockPos(3,1,3));
         first.setAge(0);second.setAge(0);entity.inventory().setItem(7,new ItemStack(Items.WHEAT,2));

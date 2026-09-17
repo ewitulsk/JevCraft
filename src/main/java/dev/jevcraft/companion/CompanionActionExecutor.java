@@ -114,6 +114,9 @@ public final class CompanionActionExecutor {
     public boolean collectBrewingStand(ServerLevel level,BlockHitResult hit,int standSlot){
         return companion.distanceToSqr(hit.getLocation())<=25&&interactions.collectBrewingStand(level,hit,standSlot);
     }
+    public boolean cartography(ServerLevel level,BlockHitResult hit,int mapSlot,int additionSlot){
+        return companion.distanceToSqr(hit.getLocation())<=25&&interactions.cartography(level,hit,mapSlot,additionSlot);
+    }
     public boolean teleport(ServerLevel level, Vec3 destination) {
         if (!companion.operatorTeleportAllowed() || !Double.isFinite(destination.x) || !Double.isFinite(destination.y) || !Double.isFinite(destination.z)) return false;
         BlockPos target = BlockPos.containing(destination); level.getChunkAt(target);
