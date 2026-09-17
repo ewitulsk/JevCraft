@@ -1,7 +1,9 @@
 package dev.jevcraft.companion;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
@@ -108,7 +110,7 @@ public final class CompanionActionExecutor {
 
     public Result tick(ServerLevel level) {
         if(rangedTarget!=null) return tickRanged(level);
-        if(movementTarget!=null)return tickMove();
+        if(movementTarget!=null)return tickMove(level);
         if (miningTarget == null) return Result.IDLE;
         if (actionGoalVersion != companion.goalVersion()) { cancel(); return lastResult = Result.INVALID; }
         BlockState state = level.getBlockState(miningTarget);
@@ -133,12 +135,22 @@ public final class CompanionActionExecutor {
         miningTarget = null; miningProgress = 0;
         return lastResult = success ? Result.SUCCEEDED : Result.INVALID;
     }
-    private Result tickMove(){
+    private Result tickMove(ServerLevel level){
         if(actionGoalVersion!=companion.goalVersion()){lastFailure="stale_goal";cancel();return lastResult=Result.INVALID;}
         if(++movementTicks>400){lastFailure="timeout";cancel();return lastResult=Result.INVALID;}
         if(companion.distanceToSqr(movementTarget)<=2.25){companion.getNavigation().stop();movementTarget=null;movementTicks=0;return lastResult=Result.SUCCEEDED;}
+        openNearbyFenceGates(level);
         if(companion.getNavigation().isDone()||movementTicks%10==1)if(!companion.getNavigation().moveTo(movementTarget.x,movementTarget.y,movementTarget.z,movementSpeed)){lastFailure="no_path";cancel();return lastResult=Result.INVALID;}
         companion.getLookControl().setLookAt(movementTarget);return lastResult=Result.MOVING;
+    }
+    private void openNearbyFenceGates(ServerLevel level){
+        BlockPos center=companion.blockPosition();
+        for(BlockPos candidate:BlockPos.betweenClosed(center.offset(-2,-1,-2),center.offset(2,1,2))){
+            BlockState state=level.getBlockState(candidate);
+            if(state.getBlock() instanceof FenceGateBlock&& !state.getValue(FenceGateBlock.OPEN)&&companion.distanceToSqr(Vec3.atCenterOf(candidate))<=9){
+                interactions.useItemOn(level,new BlockHitResult(Vec3.atCenterOf(candidate),Direction.UP,candidate.immutable(),false),0);
+            }
+        }
     }
     private Result tickRanged(ServerLevel level){
         if(actionGoalVersion!=companion.goalVersion()||!rangedTarget.isAlive()||rangedTarget.level()!=level||bowSlot<0||bowSlot>=companion.inventory().getContainerSize()||ammoSlot<0||ammoSlot>=companion.inventory().getContainerSize()){

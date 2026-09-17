@@ -14,6 +14,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.core.Direction;
@@ -57,6 +58,14 @@ public final class JevGameTests {
         helper.setBlock(new BlockPos(3,1,2),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.EAST).setValue(DoorBlock.HALF,DoubleBlockHalf.LOWER));helper.setBlock(new BlockPos(3,2,2),Blocks.OAK_DOOR.defaultBlockState().setValue(DoorBlock.FACING,Direction.EAST).setValue(DoorBlock.HALF,DoubleBlockHalf.UPPER));
         JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(1,1,2));entity.acceptGoal("walk through closed door");Vec3 target=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,1,2)));helper.runAfterDelay(2,()->entity.actions().beginMove(target,1,entity.goalVersion()));
         helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"door-capable navigation did not complete; failure="+entity.actions().lastFailure());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"companion did not emerge beyond closed-door barrier");});
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 240)
+    public static void companionNavigatesThroughClosedFenceGate(GameTestHelper helper) {
+        for(int x=0;x<8;x++){for(int z=1;z<=3;z++)helper.setBlock(new BlockPos(x,0,z),Blocks.STONE);for(int y=1;y<=2;y++){helper.setBlock(new BlockPos(x,y,1),Blocks.STONE);helper.setBlock(new BlockPos(x,y,3),Blocks.STONE);}}
+        helper.setBlock(new BlockPos(3,1,2),Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING,Direction.EAST).setValue(FenceGateBlock.OPEN,false));
+        JevCompanion entity=helper.spawn(JevCraft.JEV.get(),new BlockPos(1,1,2));entity.acceptGoal("walk through closed fence gate");Vec3 target=Vec3.atBottomCenterOf(helper.absolutePos(new BlockPos(6,1,2)));helper.runAfterDelay(2,()->entity.actions().beginMove(target,1,entity.goalVersion()));
+        helper.succeedWhen(()->{helper.assertValueEqual(entity.actions().lastResult(),dev.jevcraft.companion.CompanionActionExecutor.Result.SUCCEEDED,"fence-gate navigation did not complete; failure="+entity.actions().lastFailure());helper.assertTrue(entity.distanceToSqr(target)<=2.25,"companion did not emerge beyond closed fence-gate barrier");helper.assertTrue(helper.getBlockState(new BlockPos(3,1,2)).getValue(FenceGateBlock.OPEN),"companion did not open fence gate through normal interaction");});
     }
 
     @GameTest(template = "empty", timeoutTicks = 100)
